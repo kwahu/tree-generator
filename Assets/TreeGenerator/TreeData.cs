@@ -124,8 +124,9 @@ public class BranchSettings
     [Tooltip("Cross-section smoothness of branches.")]
     public int sides = 5;
 
-    [Tooltip("If enabled, shorter branches get fewer segments (shortest = 1, longest = max segments).")]
-    public bool scaleSegmentsByLength = true;
+    [Tooltip("X: długość głównej gałęzi względem najkrótszej i najdłuższej w tym drzewie (0=najkrótsza, 1=najdłuższa). Y: udział max segmentów 0..1 (0≈1 segment, 1=wszystkie segmenty z pola Max segmentów).")]
+    public AnimationCurve segmentsByBranchLength = new AnimationCurve(
+        new Keyframe(0f, 0f), new Keyframe(1f, 1f));
 
     [Tooltip("If enabled, the number of branch sides decreases with each segment, ending at 3 on the last segment.")]
     public bool reduceSidesPerSegmentToThree = false;

@@ -10,6 +10,7 @@ using UnityEngine;
 /// </summary>
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 [ExecuteInEditMode]
+[ExecuteAlways]
 public class TreeGenerator : MonoBehaviour
 {
     public TreeData data;
@@ -20,13 +21,53 @@ public class TreeGenerator : MonoBehaviour
     public bool forceLeafNormalsToSun = true;
     [Range(0f, 0.8f)] public float leafBakeMinSunDot = 0.2f;
     [Min(0.01f)] public float woodUvWorldSize = 0.25f;
+    [Header("Wiatr liści (URP: TreeGenerator/Leaf Baked Lit, Leaf Billboard Opaque)")]
+    [Tooltip("Wymaga materiału z powyższymi shaderami. Parametry co klatkę trafiają do MaterialPropertyBlock na wszystkich MeshRendererach pod tym obiektem.")]
+    public bool leafWindEnabled = false;
+    [Min(0f)] public float leafWindStrength = 0.12f;
+    [Min(0f)] public float leafWindFrequency = 2f;
+    [Range(0f, 2f)] public float leafWindTurbulence = 0.65f;
+    [Min(0.01f)] public float leafWindPhaseScale = 2.5f;
+    [Range(0.25f, 4f)] public float leafWindMaskExponent = 2f;
+    [Tooltip("Kierunek podmuchu w przestrzeni świata (normalizowany przy aplikowaniu).")]
+    public Vector3 leafWindDirection = new Vector3(1f, 0.05f, 0.3f);
     public bool autoGenerateLods = true;
     [Range(1, 5)] public int lodLevels = 3;
     [Range(0.1f, 0.9f)] public float lodStartScreenRelativeHeight = 0.6f;
     [Range(0.01f, 0.4f)] public float lodEndScreenRelativeHeight = 0.05f;
+    [Tooltip("Od tego indeksu LOD włącznie nie generuje się siatki drewna głównych gałęzi (__AutoLOD_N ma N równe temu indeksowi). LOD0 zawsze pełny. 6 = nigdy nie ukrywaj.")]
+    [Range(1, 6)] public int lodHideMainBranchWoodFromLevel = 3;
+    [Tooltip("Od tego indeksu LOD włącznie nie generuje się drewna podgałęzi. 6 = nigdy nie ukrywaj.")]
+    [Range(1, 6)] public int lodHideSubBranchWoodFromLevel = 2;
+    [Tooltip("Od tego indeksu LOD włącznie nie generuje się drewna gałązek (poziom 2). 6 = nigdy nie ukrywaj.")]
+    [Range(1, 6)] public int lodHideSubBranchLevel2WoodFromLevel = 1;
     [Range(0.01f, 1f)] public float lodFinalLeafCountMultiplier = 0.08f;
     [Range(1f, 4f)] public float lodFinalLeafSizeMultiplier = 2.2f;
     [Range(0.5f, 3f)] public float lodLeafReductionExponent = 1.5f;
+    [Tooltip("Od tego poziomu LOD (1 = pierwszy zdalny mesh) włączana jest redukcja liczby liści (mnożnik + ewentualnie grupowanie). Na niższych poziomach zdalnych liści jest tyle co wynika z TreeData po innych regułach LOD.")]
+    [Range(1, 5)] public int lodLeafCountReductionStartLevel = 1;
+    public bool useLeafVolumeLods = false;
+    [Range(1, 5)] public int leafVolumeStartLodLevel = 2;
+    [Range(8, 64)] public int leafVolumeGridResolution = 24;
+    [Range(0.25f, 4f)] public float leafVolumeSampleRadiusInVoxels = 1.35f;
+    [Range(0.05f, 0.95f)] public float leafVolumeIsoLevel = 0.35f;
+    [Range(0, 4)] public int leafVolumeSmoothIterations = 1;
+    [Range(0f, 0.8f)] public float leafVolumeBoundsPadding = 0.12f;
+    public LeafVolumeGeometryOptimizeMode leafVolumeGeometryOptimize = LeafVolumeGeometryOptimizeMode.WeldAndRemoveDegenerate;
+    [Range(0.00005f, 0.08f)] public float leafVolumeWeldEpsilon = 0.0025f;
+    [Range(0f, 0.0001f)] public float leafVolumeMinTriangleAreaSq = 0f;
+    [Tooltip("Morfologiczne zamykanie maski pola (density >= iso) przed marching — wypełnia małe przerwy w siatce.")]
+    public bool leafVolumeCloseFieldHoles = true;
+    [Range(1, 4)] public int leafVolumeHoleCloseRadius = 2;
+    [Range(0, 3)] public int leafVolumeSmoothAfterHoleClose = 1;
+    [Tooltip("Zamiast siatki liści/korony: nieprzezroczyste quady billboard (shader camera-facing) na próbkach z LOD0.")]
+    public bool useBillboardLeafLods = false;
+    [Range(1, 5)] public int billboardLeafLodStartLevel = 2;
+    [Range(4, 256)] public int billboardLeafLodMaxSprites = 48;
+    [Min(0.02f)] public float billboardLeafWorldWidth = 0.55f;
+    [Min(0.02f)] public float billboardLeafWorldHeight = 0.75f;
+    [Range(0f, 0.5f)] public float billboardLeafJitterRadius = 0.08f;
+    public Material billboardLeafMaterial;
     [Range(0f, 1f)] public float lod1TopLeafSizeDamping = 0f;
     [Range(0f, 1f)] public float lod2TopLeafSizeDamping = 0.25f;
     [Range(0f, 1f)] public float lod3TopLeafSizeDamping = 0.5f;
@@ -37,6 +78,7 @@ public class TreeGenerator : MonoBehaviour
         new Keyframe(0.6f, 0f),
         new Keyframe(0.82f, 0.45f),
         new Keyframe(1f, 1f));
+    [Tooltip("Wyłączenie wyłącza zarówno grupy liści w środku korony, jak i tłumienie rozmiaru liści u góry korony na LOD.")]
     public bool enableLodInnerLeafClustering = true;
     [Range(0f, 1f)] public float lodInnerClusterRangeMin01 = 0f;
     [Range(0f, 1f)] public float lodInnerClusterRangeMax01 = 0.36f;
@@ -67,6 +109,13 @@ public class TreeGenerator : MonoBehaviour
     [Range(0.1f, 2f)] public float lodLightmapScalePower = 0.7f;
     public bool lodLightmapScaleUseWoodOnly = true;
     [Range(0f, 1f)] public float lodLightmapScaleBiasToLod0 = 0.55f;
+    [Tooltip("Od wskazanego LOD: główne gałęzie, podgałęzie i gałązki jako cienka wstęga w płaszczyźnie pionowej — z boku widać grubość, z góry/dolu prawie nie. Pień bez zmian.")]
+    public bool lodFlatVerticalBranchWood = false;
+    [Range(1, 5)] public int lodFlatVerticalBranchStartLevel = 1;
+    [Tooltip("Gdy włączone, kolejne LOD zachowują pełną liczbę segmentów głównych gałęzi, podgałęzi i gałązek (nadal redukowane są m.in. boki rur, liście).")]
+    public bool lodPreserveBranchSegments = false;
+    [Tooltip("Gdy włączone, kolejne LOD zachowują pełną liczbę segmentów pnia (boki rury pnia nadal mogą być redukowane).")]
+    public bool lodPreserveTrunkSegments = false;
 
     // Exposed for the custom inspector info panel
     [HideInInspector] public int lastVertexCount;
@@ -92,6 +141,9 @@ public class TreeGenerator : MonoBehaviour
     private System.Random _leafMainRng;
     private System.Random _leafSubRng;
     private System.Random _leafSubLevel2Rng;
+    private System.Random _leafAlongMainRng;
+    private System.Random _leafAlongSubRng;
+    private System.Random _leafAlongSubLevel2Rng;
 
     private readonly List<Vector3> _verts    = new List<Vector3>();
     private readonly List<Vector2> _uvs      = new List<Vector2>();
@@ -99,6 +151,16 @@ public class TreeGenerator : MonoBehaviour
     private readonly List<int>     _woodTris = new List<int>();
     private readonly List<int>     _leafTris = new List<int>();
     private readonly List<int>     _clusterLeafTris = new List<int>();
+    private List<MeshRenderer> _leafWindTargets;
+    private MaterialPropertyBlock _leafWindPropertyBlock;
+    private bool _leafWindAppliedLastFrame;
+    private static readonly int LeafWindEnabledId = Shader.PropertyToID("_LeafWindEnabled");
+    private static readonly int LeafWindStrengthId = Shader.PropertyToID("_LeafWindStrength");
+    private static readonly int LeafWindFrequencyId = Shader.PropertyToID("_LeafWindFrequency");
+    private static readonly int LeafWindTurbulenceId = Shader.PropertyToID("_LeafWindTurbulence");
+    private static readonly int LeafWindPhaseScaleId = Shader.PropertyToID("_LeafWindPhaseScale");
+    private static readonly int LeafWindMaskExponentId = Shader.PropertyToID("_LeafWindMaskExponent");
+    private static readonly int LeafWindDirectionId = Shader.PropertyToID("_LeafWindDirection");
     private List<TubeNode> _currentTrunkNodes = new List<TubeNode>();
     private float _leafDistanceNormalization = 1f;
     private int _activeLodLevel = 0;
@@ -152,6 +214,98 @@ public class TreeGenerator : MonoBehaviour
             Debug.LogWarning(
                 $"[TreeGenerator] Leaf upward check failed. Upward ratio: {lastUpwardLeafRatio:P1}, required: {data.leaves.minUpwardLeafRatio:P1}.");
         }
+
+        RefreshLeafWindTargets();
+    }
+
+    private void OnEnable()
+    {
+        RefreshLeafWindTargets();
+    }
+
+    private void OnDisable()
+    {
+        RefreshLeafWindTargets();
+        ClearLeafWindPropertyBlocksOnAllTargets();
+        _leafWindAppliedLastFrame = false;
+    }
+
+    private void LateUpdate()
+    {
+        if (!isActiveAndEnabled)
+            return;
+
+        if (!leafWindEnabled)
+        {
+            if (_leafWindAppliedLastFrame)
+            {
+                if (_leafWindTargets == null || _leafWindTargets.Count == 0)
+                    RefreshLeafWindTargets();
+                ClearLeafWindPropertyBlocksOnAllTargets();
+            }
+            _leafWindAppliedLastFrame = false;
+            return;
+        }
+
+        if (_leafWindTargets == null || _leafWindTargets.Count == 0)
+            RefreshLeafWindTargets();
+
+        EnsureLeafWindPropertyBlock();
+        Vector3 dir = leafWindDirection.sqrMagnitude > 1e-8f
+            ? leafWindDirection.normalized
+            : Vector3.right;
+        _leafWindPropertyBlock.SetFloat(LeafWindEnabledId, 1f);
+        _leafWindPropertyBlock.SetFloat(LeafWindStrengthId, leafWindStrength);
+        _leafWindPropertyBlock.SetFloat(LeafWindFrequencyId, leafWindFrequency);
+        _leafWindPropertyBlock.SetFloat(LeafWindTurbulenceId, leafWindTurbulence);
+        _leafWindPropertyBlock.SetFloat(LeafWindPhaseScaleId, leafWindPhaseScale);
+        _leafWindPropertyBlock.SetFloat(LeafWindMaskExponentId, leafWindMaskExponent);
+        _leafWindPropertyBlock.SetVector(LeafWindDirectionId, new Vector4(dir.x, dir.y, dir.z, 0f));
+
+        for (int i = 0; i < _leafWindTargets.Count; i++)
+            ApplyLeafWindPropertyBlockToRenderer(_leafWindTargets[i]);
+
+        _leafWindAppliedLastFrame = true;
+    }
+
+    private void RefreshLeafWindTargets()
+    {
+        _leafWindTargets ??= new List<MeshRenderer>(16);
+        _leafWindTargets.Clear();
+        _leafWindTargets.AddRange(GetComponentsInChildren<MeshRenderer>(true));
+    }
+
+    private void EnsureLeafWindPropertyBlock()
+    {
+        _leafWindPropertyBlock ??= new MaterialPropertyBlock();
+    }
+
+    private void ApplyLeafWindPropertyBlockToRenderer(MeshRenderer mr)
+    {
+        if (mr == null)
+            return;
+        Material[] mats = mr.sharedMaterials;
+        if (mats == null || mats.Length == 0)
+            return;
+        for (int i = 0; i < mats.Length; i++)
+            mr.SetPropertyBlock(_leafWindPropertyBlock, i);
+    }
+
+    private void ClearLeafWindPropertyBlocksOnAllTargets()
+    {
+        if (_leafWindTargets == null)
+            return;
+        for (int i = 0; i < _leafWindTargets.Count; i++)
+        {
+            MeshRenderer mr = _leafWindTargets[i];
+            if (mr == null)
+                continue;
+            Material[] mats = mr.sharedMaterials;
+            if (mats == null)
+                continue;
+            for (int m = 0; m < mats.Length; m++)
+                mr.SetPropertyBlock(null, m);
+        }
     }
 
     [ContextMenu("Generate Lightmap UVs")]
@@ -171,15 +325,26 @@ public class TreeGenerator : MonoBehaviour
 #endif
     }
 
+    /// <summary>
+    /// LOD0: zawsze rysuj. Dla przejścia na mesh dziecka z indeksem N — ukryj drewno, gdy N &gt;= próg (1..5).
+    /// Wartość 6 = nigdy nie ukrywaj tej kategorii na żadnym LOD.
+    /// </summary>
+    private bool BranchWoodMeshVisibleThisLod(int hideFromLevelInclusive)
+    {
+        int h = Mathf.Clamp(hideFromLevelInclusive, 1, 6);
+        if (h >= 6) return true;
+        return _activeLodLevel < h;
+    }
+
     private void GenerateSinglePass(TreeData sourceData, int lodLevel)
     {
         TreeData previousData = data;
         data = sourceData;
         _activeLodLevel = Mathf.Max(0, lodLevel);
         _leafDistanceNormalization = ComputeLeafDistanceNormalization();
-        bool renderMainBranchGeometry = _activeLodLevel < 3;
-        bool renderSubBranchGeometry = _activeLodLevel < 2;
-        bool renderSubBranchLevel2Geometry = _activeLodLevel < 1;
+        bool renderMainBranchGeometry = BranchWoodMeshVisibleThisLod(lodHideMainBranchWoodFromLevel);
+        bool renderSubBranchGeometry = BranchWoodMeshVisibleThisLod(lodHideSubBranchWoodFromLevel);
+        bool renderSubBranchLevel2Geometry = BranchWoodMeshVisibleThisLod(lodHideSubBranchLevel2WoodFromLevel);
 
         _rng = new System.Random(data.seed);
         _subBranchRng = new System.Random(unchecked((data.seed * 557) ^ (int)0x85EBCA6Bu));
@@ -187,6 +352,10 @@ public class TreeGenerator : MonoBehaviour
         _leafMainRng = new System.Random(unchecked((data.seed * 397) ^ (int)0x9E3779B9u));
         _leafSubRng = new System.Random(unchecked((data.seed * 733) ^ (int)0x7F4A7C15u));
         _leafSubLevel2Rng = new System.Random(unchecked((data.seed * 1231) ^ (int)0x27D4EB2Fu));
+        // Osobne strumienie dla próbkowania krzywych alongDistribution* (nie korelują z tip/węzłami/orientacją).
+        _leafAlongMainRng = new System.Random(unchecked((data.seed * 1549) ^ (int)0x85EBCA6Bu));
+        _leafAlongSubRng = new System.Random(unchecked((data.seed * 1741) ^ (int)0xC2B2AE35u));
+        _leafAlongSubLevel2Rng = new System.Random(unchecked((data.seed * 1949) ^ (int)0x165667B1u));
         _verts.Clear();
         _uvs.Clear();
         _colors.Clear();
@@ -199,6 +368,10 @@ public class TreeGenerator : MonoBehaviour
         _generatedClusterLeafCount = 0;
         _upwardLeafCount = 0;
         _checkedLeafCount = 0;
+
+        bool flatVerticalBranchWood =
+            lodFlatVerticalBranchWood
+            && _activeLodLevel >= Mathf.Clamp(lodFlatVerticalBranchStartLevel, 1, 5);
 
         // ── Trunk
         List<TubeNode> trunk = BuildTrunkNodes();
@@ -232,9 +405,10 @@ public class TreeGenerator : MonoBehaviour
                     : 1f;
 
                 int branchSegments = bs.segments;
-                if (bs.scaleSegmentsByLength && bs.segments > 1 && (longestLength - shortestLength) > 1e-5f)
+                if (bs.segments > 1)
                 {
-                    branchSegments = Mathf.RoundToInt(Mathf.Lerp(1f, bs.segments, mainLength01));
+                    float segT = EvaluateSegmentsByBranchLength01(bs.segmentsByBranchLength, mainLength01);
+                    branchSegments = Mathf.RoundToInt(Mathf.Lerp(1f, bs.segments, segT));
                 }
                 branchSegments = Mathf.Clamp(branchSegments, 1, bs.segments);
                 float segmentFactor = bs.segments > 0 ? (float)branchSegments / bs.segments : 1f;
@@ -250,7 +424,12 @@ public class TreeGenerator : MonoBehaviour
                 _generatedMainBranchCount++;
 
                 if (renderMainBranchGeometry)
-                    AddTube(branch, bs.sides, wood: true, reduceSidesPerSegmentToThree: bs.reduceSidesPerSegmentToThree);
+                {
+                    if (flatVerticalBranchWood)
+                        AddVerticalRibbonTube(branch);
+                    else
+                        AddTube(branch, bs.sides, wood: true, reduceSidesPerSegmentToThree: bs.reduceSidesPerSegmentToThree);
+                }
 
                 // ── Sub-branches
                 if (data.subBranches.enabled)
@@ -292,7 +471,12 @@ public class TreeGenerator : MonoBehaviour
                         _generatedSubBranchCount++;
 
                         if (renderSubBranchGeometry)
-                            AddTube(sub, ss.sides, wood: true);
+                        {
+                            if (flatVerticalBranchWood)
+                                AddVerticalRibbonTube(sub);
+                            else
+                                AddTube(sub, ss.sides, wood: true);
+                        }
 
                         if (ss2.enabled)
                         {
@@ -326,7 +510,12 @@ public class TreeGenerator : MonoBehaviour
                                 _generatedSubBranchCount++;
 
                                 if (renderSubBranchLevel2Geometry)
-                                    AddTube(sub2, ss2.sides, wood: true);
+                                {
+                                    if (flatVerticalBranchWood)
+                                        AddVerticalRibbonTube(sub2);
+                                    else
+                                        AddTube(sub2, ss2.sides, wood: true);
+                                }
 
                                 if (data.leaves.enabled)
                                     AddLeaves(sub2, LeafTarget.SubBranchLevel2, leafSub2Length01);
@@ -371,7 +560,20 @@ public class TreeGenerator : MonoBehaviour
         }
 
         Material[] sharedMaterials = rootRenderer.sharedMaterials;
-        var lodRenderers = new List<Renderer> { rootRenderer };
+        List<Vector3> billboardCentroidsWorld = null;
+        if (useBillboardLeafLods && levelCount > 1 && sourceData != null && sourceData.leaves != null && sourceData.leaves.enabled)
+        {
+            MeshFilter rootMfLod0 = GetComponent<MeshFilter>();
+            if (rootMfLod0 != null && rootMfLod0.sharedMesh != null)
+            {
+                Mesh lod0Snap = Instantiate(rootMfLod0.sharedMesh);
+                billboardCentroidsWorld = LeafBillboardLodBuilder.CollectLeafTriangleCentroidsWorld(lod0Snap, transform);
+                if (Application.isPlaying) Destroy(lod0Snap);
+                else DestroyImmediate(lod0Snap);
+            }
+        }
+
+        var lodRenderersPerLevel = new List<Renderer[]> { new[] { rootRenderer } };
 
         for (int level = 1; level < levelCount; level++)
         {
@@ -380,7 +582,11 @@ public class TreeGenerator : MonoBehaviour
             var lodRenderer = lodObject.GetComponent<MeshRenderer>();
             lodRenderer.sharedMaterials = sharedMaterials;
 
+            bool billboardLod = ShouldUseBillboardLeafLods(level);
             TreeData lodData = CreateLodDataClone(sourceData, level, levelCount);
+            if (billboardLod)
+                lodData.leaves.enabled = false;
+
             GenerateSinglePass(lodData, level);
             woodTrianglesByLod[level] = lastWoodTriangleCount;
             leafTrianglesByLod[level] = lastLeafTriangleCount;
@@ -389,11 +595,104 @@ public class TreeGenerator : MonoBehaviour
             Mesh generated = GetComponent<MeshFilter>().sharedMesh;
             Mesh lodMesh = generated != null ? Instantiate(generated) : null;
             if (lodMesh != null)
+            {
                 lodMesh.name = $"ProceduralTree_LOD{level}";
+                if (!billboardLod && ShouldUseLeafVolumeForLod(level))
+                {
+                    Mesh volumeMesh = LeafVolumeMesher.BuildCombinedWoodAndLeafVolume(
+                        lodMesh,
+                        leafVolumeGridResolution,
+                        leafVolumeSampleRadiusInVoxels,
+                        leafVolumeIsoLevel,
+                        leafVolumeSmoothIterations,
+                        leafVolumeBoundsPadding,
+                        leafVolumeGeometryOptimize,
+                        leafVolumeWeldEpsilon,
+                        leafVolumeMinTriangleAreaSq,
+                        leafVolumeCloseFieldHoles,
+                        leafVolumeHoleCloseRadius,
+                        leafVolumeSmoothAfterHoleClose);
+
+                    if (volumeMesh != null)
+                    {
+                        if (Application.isPlaying) Destroy(lodMesh);
+                        else DestroyImmediate(lodMesh);
+                        lodMesh = volumeMesh;
+                        lodMesh.name = $"ProceduralTree_LOD{level}_LeafVolume";
+                    }
+                }
+            }
 
             AssignMeshReplacingOld(lodFilter, lodMesh);
-            lodRenderers.Add(lodRenderer);
 
+            Renderer[] renderersThisLod;
+            if (billboardLod)
+            {
+                CleanupBillboardUnderLod(lodObject);
+                GameObject bbGo = GetOrCreateBillboardChild(lodObject);
+                var bbFilter = bbGo.GetComponent<MeshFilter>();
+                var bbRenderer = bbGo.GetComponent<MeshRenderer>();
+
+                var subCentroids = new List<Vector3>();
+                if (billboardCentroidsWorld != null && billboardCentroidsWorld.Count > 0)
+                {
+                    LeafBillboardLodBuilder.SubsampleCentroids(
+                        billboardCentroidsWorld,
+                        subCentroids,
+                        Mathf.Clamp(billboardLeafLodMaxSprites, 4, 256),
+                        sourceData.seed + level * 977);
+
+                    Mesh bbMesh = LeafBillboardLodBuilder.BuildBillboardQuadMesh(
+                        subCentroids,
+                        lodObject.transform,
+                        billboardLeafWorldWidth,
+                        billboardLeafWorldHeight,
+                        sourceData.seed + level * 131,
+                        billboardLeafJitterRadius);
+
+                    AssignMeshReplacingOld(bbFilter, bbMesh);
+                    Material bbMat = billboardLeafMaterial != null ? billboardLeafMaterial : leafMaterial;
+                    bbRenderer.sharedMaterial = bbMat;
+                    bbRenderer.enabled = bbMesh != null;
+                }
+                else
+                {
+                    AssignMeshReplacingOld(bbFilter, null);
+                    bbRenderer.sharedMaterial = null;
+                    bbRenderer.enabled = false;
+                    if (billboardCentroidsWorld == null || billboardCentroidsWorld.Count == 0)
+                        Debug.LogWarning("[TreeGenerator] Billboard LOD: brak próbek z liści LOD0 — tylko drewno.");
+                }
+
+                if (lodMesh != null && lodMesh.subMeshCount > 0)
+                {
+                    woodTrianglesByLod[level] = lodMesh.GetTriangles(0).Length / 3;
+                    int bbTris = bbRenderer.enabled && bbFilter.sharedMesh != null
+                        ? bbFilter.sharedMesh.triangles.Length / 3
+                        : 0;
+                    leafTrianglesByLod[level] = bbTris;
+                    clusterLeavesByLod[level] = 0;
+                }
+
+                renderersThisLod = new[] { lodRenderer, bbRenderer };
+            }
+            else
+            {
+                CleanupBillboardUnderLod(lodObject);
+
+                if (lodMesh != null && lodMesh.subMeshCount > 0)
+                {
+                    woodTrianglesByLod[level] = lodMesh.GetTriangles(0).Length / 3;
+                    int leafTris = lodMesh.subMeshCount > 1 ? lodMesh.GetTriangles(1).Length / 3 : 0;
+                    int clusterLeafTris = lodMesh.subMeshCount > 2 ? lodMesh.GetTriangles(2).Length / 3 : 0;
+                    leafTrianglesByLod[level] = leafTris + clusterLeafTris;
+                    clusterLeavesByLod[level] = 0;
+                }
+
+                renderersThisLod = new[] { lodRenderer };
+            }
+
+            lodRenderersPerLevel.Add(renderersThisLod);
             DestroyLodClone(lodData);
         }
 
@@ -407,9 +706,9 @@ public class TreeGenerator : MonoBehaviour
             : null;
 
         CleanupExtraLodObjects(levelCount - 1);
-        ApplyLodGroupSetup(lodGroup, lodRenderers, levelCount);
+        ApplyLodGroupSetup(lodGroup, lodRenderersPerLevel, levelCount);
         SetLodTriangleStats(woodTrianglesByLod, leafTrianglesByLod, clusterLeavesByLod);
-        ApplyLodScaleInLightmap(lodRenderers, woodTrianglesByLod, leafTrianglesByLod);
+        ApplyLodScaleInLightmap(lodRenderersPerLevel, woodTrianglesByLod, leafTrianglesByLod);
 
         if (lod0FallbackMesh != null)
         {
@@ -432,6 +731,50 @@ public class TreeGenerator : MonoBehaviour
         }
     }
 
+    private bool ShouldUseLeafVolumeForLod(int lodLevel)
+    {
+        return useLeafVolumeLods && lodLevel >= Mathf.Clamp(leafVolumeStartLodLevel, 1, 5);
+    }
+
+    private bool ShouldUseBillboardLeafLods(int lodLevel)
+    {
+        return useBillboardLeafLods && lodLevel >= Mathf.Clamp(billboardLeafLodStartLevel, 1, 5);
+    }
+
+    private static GameObject GetOrCreateBillboardChild(GameObject lodObject)
+    {
+        Transform existing = lodObject.transform.Find("BillboardCanopy");
+        if (existing != null)
+            return existing.gameObject;
+
+        var go = new GameObject("BillboardCanopy");
+        go.transform.SetParent(lodObject.transform, false);
+        go.hideFlags = HideFlags.None;
+        go.AddComponent<MeshFilter>();
+        go.AddComponent<MeshRenderer>();
+        return go;
+    }
+
+    private static void CleanupBillboardUnderLod(GameObject lodObject)
+    {
+        if (lodObject == null)
+            return;
+
+        Transform t = lodObject.transform.Find("BillboardCanopy");
+        if (t == null)
+            return;
+
+        var mf = t.GetComponent<MeshFilter>();
+        if (mf != null && mf.sharedMesh != null)
+        {
+            if (Application.isPlaying) UnityEngine.Object.Destroy(mf.sharedMesh);
+            else UnityEngine.Object.DestroyImmediate(mf.sharedMesh);
+        }
+
+        if (Application.isPlaying) UnityEngine.Object.Destroy(t.gameObject);
+        else UnityEngine.Object.DestroyImmediate(t.gameObject);
+    }
+
     private void SetLodTriangleStats(
         IReadOnlyList<int> woodTrianglesByLod,
         IReadOnlyList<int> leafTrianglesByLod,
@@ -449,20 +792,28 @@ public class TreeGenerator : MonoBehaviour
     }
 
     private void ApplyLodScaleInLightmap(
-        IReadOnlyList<Renderer> lodRenderers,
+        IReadOnlyList<Renderer[]> lodRenderersPerLevel,
         IReadOnlyList<int> woodTrianglesByLod,
         IReadOnlyList<int> leafTrianglesByLod)
     {
-        if (!autoLodScaleInLightmap || lodRenderers == null || lodRenderers.Count == 0)
+        if (!autoLodScaleInLightmap || lodRenderersPerLevel == null || lodRenderersPerLevel.Count == 0)
             return;
 
         if (manualLodScaleInLightmap)
         {
-            for (int i = 0; i < lodRenderers.Count; i++)
+            for (int i = 0; i < lodRenderersPerLevel.Count; i++)
             {
-                if (!(lodRenderers[i] is MeshRenderer meshRenderer)) continue;
-                meshRenderer.scaleInLightmap = Mathf.Max(0.001f, GetManualLodScaleInLightmap(i));
-                meshRenderer.stitchLightmapSeams = true;
+                Renderer[] group = lodRenderersPerLevel[i];
+                if (group == null) continue;
+                float scale = Mathf.Max(0.001f, GetManualLodScaleInLightmap(i));
+                for (int g = 0; g < group.Length; g++)
+                {
+                    if (group[g] is MeshRenderer meshRenderer)
+                    {
+                        meshRenderer.scaleInLightmap = scale;
+                        meshRenderer.stitchLightmapSeams = true;
+                    }
+                }
             }
 
             return;
@@ -489,9 +840,10 @@ public class TreeGenerator : MonoBehaviour
         float power = Mathf.Max(0.01f, lodLightmapScalePower);
         float lod0Bias = Mathf.Clamp01(lodLightmapScaleBiasToLod0);
 
-        for (int i = 0; i < lodRenderers.Count; i++)
+        for (int i = 0; i < lodRenderersPerLevel.Count; i++)
         {
-            if (lodRenderers[i] == null) continue;
+            Renderer[] group = lodRenderersPerLevel[i];
+            if (group == null) continue;
 
             int tris = canUseWoodOnly
                 ? ((woodTrianglesByLod != null && i < woodTrianglesByLod.Count) ? Mathf.Max(0, woodTrianglesByLod[i]) : 0)
@@ -507,10 +859,13 @@ public class TreeGenerator : MonoBehaviour
             float ratio = Mathf.Clamp01((float)tris / baseTris);
             float rawScale = i == 0 ? 1f : Mathf.Max(minScale, Mathf.Pow(ratio, power));
             float scale = i == 0 ? 1f : Mathf.Lerp(rawScale, 1f, lod0Bias);
-            if (lodRenderers[i] is MeshRenderer meshRenderer)
+            for (int g = 0; g < group.Length; g++)
             {
-                meshRenderer.scaleInLightmap = scale;
-                meshRenderer.stitchLightmapSeams = true;
+                if (group[g] is MeshRenderer meshRenderer)
+                {
+                    meshRenderer.scaleInLightmap = scale;
+                    meshRenderer.stitchLightmapSeams = true;
+                }
             }
         }
     }
@@ -527,14 +882,19 @@ public class TreeGenerator : MonoBehaviour
         }
     }
 
-    private void ApplyLodGroupSetup(LODGroup group, List<Renderer> lodRenderers, int levelCount)
+    private void ApplyLodGroupSetup(LODGroup group, List<Renderer[]> lodRenderersPerLevel, int levelCount)
     {
         var lods = new LOD[levelCount];
         for (int i = 0; i < levelCount; i++)
         {
             float t = levelCount <= 1 ? 0f : (float)i / (levelCount - 1);
             float transition = Mathf.Lerp(lodStartScreenRelativeHeight, lodEndScreenRelativeHeight, t);
-            lods[i] = new LOD(Mathf.Clamp(transition, 0.001f, 1f), new[] { lodRenderers[i] });
+            Renderer[] r = lodRenderersPerLevel != null && i < lodRenderersPerLevel.Count
+                ? lodRenderersPerLevel[i]
+                : null;
+            if (r == null || r.Length == 0)
+                r = new Renderer[] { GetComponent<MeshRenderer>() };
+            lods[i] = new LOD(Mathf.Clamp(transition, 0.001f, 1f), r);
         }
 
         group.fadeMode = LODFadeMode.None;
@@ -584,20 +944,31 @@ public class TreeGenerator : MonoBehaviour
         float t = levelCount <= 1 ? 1f : (float)level / (levelCount - 1);
         float geoScale = Mathf.Lerp(1f, 0.3f, t);
         float leafT = Mathf.Pow(t, Mathf.Max(0.5f, lodLeafReductionExponent));
-        float leafCountScale = Mathf.Lerp(1f, Mathf.Clamp01(lodFinalLeafCountMultiplier), leafT);
-        leafCountScale *= GetInnerClusterLeafCountReductionForLod(level);
+        int leafReductionStartLod = Mathf.Clamp(lodLeafCountReductionStartLevel, 1, 5);
+        float leafCountScale = level < leafReductionStartLod
+            ? 1f
+            : Mathf.Lerp(1f, Mathf.Clamp01(lodFinalLeafCountMultiplier), leafT)
+              * GetInnerClusterLeafCountReductionForLod(level);
         float leafSizeScale = Mathf.Lerp(1f, Mathf.Max(1f, lodFinalLeafSizeMultiplier), leafT);
 
-        // Preserve tree shape/silhouette: reduce only mesh resolution (segments/sides).
-        clone.trunk.segments = Mathf.Max(2, Mathf.RoundToInt(sourceData.trunk.segments * geoScale));
+        // Preserve tree shape/silhouette: reduce mesh resolution (segments/sides); optional full segment counts.
+        clone.trunk.segments = lodPreserveTrunkSegments
+            ? Mathf.Max(2, sourceData.trunk.segments)
+            : Mathf.Max(2, Mathf.RoundToInt(sourceData.trunk.segments * geoScale));
         clone.trunk.sides = Mathf.Max(3, Mathf.RoundToInt(sourceData.trunk.sides * geoScale));
 
-        clone.mainBranches.segments = Mathf.Max(1, Mathf.RoundToInt(sourceData.mainBranches.segments * geoScale));
+        clone.mainBranches.segments = lodPreserveBranchSegments
+            ? Mathf.Max(1, sourceData.mainBranches.segments)
+            : Mathf.Max(1, Mathf.RoundToInt(sourceData.mainBranches.segments * geoScale));
         clone.mainBranches.sides = Mathf.Max(3, Mathf.RoundToInt(sourceData.mainBranches.sides * geoScale));
 
-        clone.subBranches.segments = Mathf.Max(1, Mathf.RoundToInt(sourceData.subBranches.segments * geoScale));
+        clone.subBranches.segments = lodPreserveBranchSegments
+            ? Mathf.Max(1, sourceData.subBranches.segments)
+            : Mathf.Max(1, Mathf.RoundToInt(sourceData.subBranches.segments * geoScale));
         clone.subBranches.sides = Mathf.Max(3, Mathf.RoundToInt(sourceData.subBranches.sides * geoScale));
-        clone.subBranchesLevel2.segments = Mathf.Max(1, Mathf.RoundToInt(sourceData.subBranchesLevel2.segments * geoScale));
+        clone.subBranchesLevel2.segments = lodPreserveBranchSegments
+            ? Mathf.Max(1, sourceData.subBranchesLevel2.segments)
+            : Mathf.Max(1, Mathf.RoundToInt(sourceData.subBranchesLevel2.segments * geoScale));
         clone.subBranchesLevel2.sides = Mathf.Max(3, Mathf.RoundToInt(sourceData.subBranchesLevel2.sides * geoScale));
 
         // Aggressive leaf reduction for LODs + size compensation.
@@ -624,10 +995,13 @@ public class TreeGenerator : MonoBehaviour
 
         clone.leaves.minSize = sourceData.leaves.minSize * leafSizeScale;
         clone.leaves.maxSize = sourceData.leaves.maxSize * leafSizeScale;
+        float topLeafDampingForCurve = enableLodInnerLeafClustering
+            ? GetTopLeafDampingForLod(level)
+            : 1f;
         clone.leaves.sizeByTreeHeight = CreateLodHeightSizeCurve(
             sourceData.leaves.sizeByTreeHeight,
             leafT,
-            GetTopLeafDampingForLod(level),
+            topLeafDampingForCurve,
             level);
         clone.leaves.minSeparationMainBranch = sourceData.leaves.minSeparationMainBranch * Mathf.Lerp(1f, 0.55f, leafT);
         clone.leaves.minSeparationSubBranch = sourceData.leaves.minSeparationSubBranch * Mathf.Lerp(1f, 0.55f, leafT);
@@ -1171,10 +1545,10 @@ public class TreeGenerator : MonoBehaviour
         while (represented < count && attempts < maxAttempts)
         {
             attempts++;
-            float t = Mathf.Lerp(startT, 1f, NextLeafFloat(target));
+            float t = Mathf.Lerp(startT, 1f, NextLeafAlongFloat(target));
             float rel = Mathf.InverseLerp(startT, 1f, t);
             float d = densityCurve.Evaluate(rel) / maxD;
-            if (NextLeafFloat(target) > d) continue;
+            if (NextLeafAlongFloat(target) > d) continue;
 
             TubeNode node = InterpolateNode(branchNodes, t);
             if (!TryGenerateLeafPlacement(node, ls, target, placedLeafStems, minLeafSeparation,
@@ -1205,7 +1579,7 @@ public class TreeGenerator : MonoBehaviour
         while (represented < count && fallbackAttempts < maxFallbackAttempts)
         {
             fallbackAttempts++;
-            float t = Mathf.Lerp(startT, 1f, NextLeafFloat(target));
+            float t = Mathf.Lerp(startT, 1f, NextLeafAlongFloat(target));
             TubeNode node = InterpolateNode(branchNodes, t);
             if (!TryGenerateLeafPlacement(node, ls, target, placedLeafStems, minLeafSeparation,
                     out Vector3 stem, out Vector3 leafDir, out Vector3 radial, out float size))
@@ -1666,6 +2040,113 @@ public class TreeGenerator : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Wood-only LOD: ribbon in the vertical plane through the branch tangent and world up
+    /// (width = component of up ⟂ tangent). Ignores roll/twist baked into TubeNode.rotation.
+    /// Two-sided quads; no tip cap (minimal silhouette from above/below).
+    /// </summary>
+    private void AddVerticalRibbonTube(List<TubeNode> nodes)
+    {
+        if (nodes == null || nodes.Count < 2) return;
+
+        List<int> tris = _woodTris;
+        float uvWorldSize = Mathf.Max(0.01f, woodUvWorldSize);
+
+        var cumulativeLen = new float[nodes.Count];
+        cumulativeLen[0] = 0f;
+        for (int i = 1; i < nodes.Count; i++)
+            cumulativeLen[i] = cumulativeLen[i - 1] + Vector3.Distance(nodes[i - 1].position, nodes[i].position);
+
+        var ringLeft = new int[nodes.Count];
+        Vector3 prevWidthDir = Vector3.zero;
+        bool havePrevWidth = false;
+        for (int ring = 0; ring < nodes.Count; ring++)
+        {
+            TubeNode node = nodes[ring];
+            Vector3 axis = GetRibbonPolylineTangent(nodes, ring);
+            Vector3 widthDir = VerticalRibbonWidthDirFromAxis(axis);
+            if (havePrevWidth && Vector3.Dot(widthDir, prevWidthDir) < 0f)
+                widthDir = -widthDir;
+            prevWidthDir = widthDir;
+            havePrevWidth = true;
+            float halfW = Mathf.Max(1e-6f, node.radius);
+            float v = cumulativeLen[ring] / uvWorldSize;
+            float uSpan = (2f * halfW) / uvWorldSize;
+
+            ringLeft[ring] = _verts.Count;
+            _verts.Add(node.position - widthDir * halfW);
+            _uvs.Add(new Vector2(0f, v));
+            _colors.Add(Color.white);
+
+            _verts.Add(node.position + widthDir * halfW);
+            _uvs.Add(new Vector2(uSpan, v));
+            _colors.Add(Color.white);
+        }
+
+        for (int n = 0; n < nodes.Count - 1; n++)
+        {
+            int l0 = ringLeft[n];
+            int r0 = l0 + 1;
+            int l1 = ringLeft[n + 1];
+            int r1 = l1 + 1;
+
+            tris.Add(l0);
+            tris.Add(l1);
+            tris.Add(r0);
+            tris.Add(r0);
+            tris.Add(l1);
+            tris.Add(r1);
+
+            tris.Add(l0);
+            tris.Add(r0);
+            tris.Add(l1);
+            tris.Add(r0);
+            tris.Add(r1);
+            tris.Add(l1);
+        }
+    }
+
+    /// <summary>Center-difference tangent along the branch polyline (twist/roll does not affect it).</summary>
+    private static Vector3 GetRibbonPolylineTangent(List<TubeNode> nodes, int i)
+    {
+        if (nodes.Count < 2)
+            return Vector3.up;
+        if (i <= 0)
+            return SegmentDirection(nodes[0].position, nodes[1].position);
+        if (i >= nodes.Count - 1)
+            return SegmentDirection(nodes[nodes.Count - 2].position, nodes[nodes.Count - 1].position);
+        return SegmentDirection(nodes[i - 1].position, nodes[i + 1].position);
+    }
+
+    private static Vector3 SegmentDirection(Vector3 a, Vector3 b)
+    {
+        Vector3 d = b - a;
+        return d.sqrMagnitude < 1e-12f ? Vector3.up : d.normalized;
+    }
+
+    /// <summary>
+    /// Unit width vector in the plane spanned by world up and tangent, perpendicular to tangent
+    /// (vertical ribbon: thick in screen elevation, thin in top-down view).
+    /// </summary>
+    private static Vector3 VerticalRibbonWidthDirFromAxis(Vector3 axis)
+    {
+        if (axis.sqrMagnitude < 1e-12f)
+            axis = Vector3.up;
+        else
+            axis.Normalize();
+
+        Vector3 w = Vector3.up - axis * Vector3.Dot(Vector3.up, axis);
+        if (w.sqrMagnitude < 1e-10f)
+        {
+            Vector3 h = Vector3.Cross(axis, Vector3.forward);
+            if (h.sqrMagnitude < 1e-10f)
+                h = Vector3.Cross(axis, Vector3.right);
+            return h.sqrMagnitude < 1e-10f ? Vector3.right : h.normalized;
+        }
+
+        return w.normalized;
+    }
+
     // ── Mesh commit ───────────────────────────────────────────────────────────
 
     private void CommitMesh()
@@ -1861,6 +2342,18 @@ public class TreeGenerator : MonoBehaviour
         return RandRange(s.minLength, s.maxLength) * hFactor;
     }
 
+    /// <summary>
+    /// Y = udział max segmentów (0..1) dla znormalizowanej długości gałęzi (0=najkrótsza, 1=najdłuższa w zestawie).
+    /// Pusta krzywa → liniowo jak X.
+    /// </summary>
+    private static float EvaluateSegmentsByBranchLength01(AnimationCurve curve, float length01)
+    {
+        float x = Mathf.Clamp01(length01);
+        if (curve == null || curve.length == 0)
+            return x;
+        return Mathf.Clamp01(curve.Evaluate(x));
+    }
+
     private float ComputeLeafDistanceNormalization()
     {
         if (data == null) return 1f;
@@ -1966,6 +2459,18 @@ public class TreeGenerator : MonoBehaviour
             LeafTarget.SubBranch => (float)_leafSubRng.NextDouble(),
             LeafTarget.SubBranchLevel2 => (float)_leafSubLevel2Rng.NextDouble(),
             _ => (float)_leafMainRng.NextDouble()
+        };
+    }
+
+    /// <summary>Losowanie wyłącznie dla krzywych alongDistribution (main / sub / sub2) — osobny seed od reszty liści.</summary>
+    private float NextLeafAlongFloat(LeafTarget target)
+    {
+        return target switch
+        {
+            LeafTarget.MainBranch => (float)_leafAlongMainRng.NextDouble(),
+            LeafTarget.SubBranch => (float)_leafAlongSubRng.NextDouble(),
+            LeafTarget.SubBranchLevel2 => (float)_leafAlongSubLevel2Rng.NextDouble(),
+            _ => (float)_leafAlongMainRng.NextDouble()
         };
     }
     private float NextFloat()                       => (float)_rng.NextDouble();

@@ -13,6 +13,15 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
         _GIInfluence("GI Influence", Range(0, 1)) = 1
         _GIContrast("GI Contrast", Range(0, 2)) = 1
         _GIBrightness("GI Brightness", Range(-1, 1)) = 0
+
+        [Header(Leaf Wind)]
+        _LeafWindEnabled("Leaf Wind Enabled", Float) = 0
+        _LeafWindStrength("Wind Strength", Float) = 0.12
+        _LeafWindFrequency("Wind Frequency", Float) = 2
+        _LeafWindTurbulence("Wind Turbulence", Range(0, 2)) = 0.65
+        _LeafWindPhaseScale("Wind Phase Scale", Float) = 2.5
+        _LeafWindMaskExponent("Tip Mask Exponent", Range(0.25, 4)) = 2
+        _LeafWindDirection("Wind Direction (world)", Vector) = (1, 0.05, 0.3, 0)
     }
 
     SubShader
@@ -46,6 +55,7 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "LeafWind.hlsl"
 
             struct Attributes
             {
@@ -75,6 +85,13 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
                 float _GIInfluence;
                 float _GIContrast;
                 float _GIBrightness;
+                float _LeafWindEnabled;
+                float _LeafWindStrength;
+                float _LeafWindFrequency;
+                float _LeafWindTurbulence;
+                float _LeafWindPhaseScale;
+                float _LeafWindMaskExponent;
+                float4 _LeafWindDirection;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);
@@ -82,7 +99,6 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
 
             inline half3 ApplyGIControls(half3 gi)
             {
-                // Contrast around 0.5 + brightness offset.
                 half3 contrasted = (gi - 0.5h) * _GIContrast + 0.5h;
                 contrasted += _GIBrightness;
                 return max(contrasted, 0.0h);
@@ -91,11 +107,23 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
             Varyings vert(Attributes input)
             {
                 Varyings output;
-                VertexPositionInputs posInputs = GetVertexPositionInputs(input.positionOS.xyz);
                 VertexNormalInputs normInputs = GetVertexNormalInputs(input.normalOS);
 
-                output.positionCS = posInputs.positionCS;
-                output.positionWS = posInputs.positionWS;
+                float3 posWS = TransformObjectToWorld(input.positionOS.xyz);
+                posWS = TreeGeneratorApplyLeafWindWS(
+                    posWS,
+                    input.uv,
+                    _LeafWindEnabled,
+                    _LeafWindStrength,
+                    _LeafWindFrequency,
+                    _LeafWindTurbulence,
+                    _LeafWindPhaseScale,
+                    _LeafWindMaskExponent,
+                    _LeafWindDirection.xyz,
+                    _Time.y);
+
+                output.positionCS = TransformWorldToHClip(posWS);
+                output.positionWS = posWS;
                 output.normalWS = NormalizeNormalPerVertex(normInputs.normalWS);
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.color = input.color;
@@ -103,7 +131,7 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
                 OUTPUT_LIGHTMAP_UV(input.uv2, unity_LightmapST, output.lightmapUV);
                 OUTPUT_SH(output.normalWS, output.vertexSH);
 
-                output.fogCoord = ComputeFogFactor(posInputs.positionCS.z);
+                output.fogCoord = ComputeFogFactor(output.positionCS.z);
                 return output;
             }
 
@@ -120,7 +148,6 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
                 half3 bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, normalWS);
                 half3 tunedGI = ApplyGIControls(bakedGI);
 
-                // 0 = ignore GI (flat albedo), 1 = full tuned GI.
                 half3 giMul = lerp(1.0h.xxx, tunedGI, _GIInfluence);
 
                 half3 vtxTint = lerp(1.0h.xxx, input.color.rgb, _VertexColorStrength);
@@ -142,28 +169,72 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
 
             HLSLPROGRAM
             #pragma target 3.0
-            #pragma vertex ShadowPassVertex
-            #pragma fragment ShadowPassFragment
+            #pragma vertex ShadowVertLeaf
+            #pragma fragment ShadowFragLeaf
             #pragma multi_compile _ _ALPHATEST_ON
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+            #include "LeafWind.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
                 float4 _BaseMap_ST;
                 float _Cutoff;
+                float _LeafWindEnabled;
+                float _LeafWindStrength;
+                float _LeafWindFrequency;
+                float _LeafWindTurbulence;
+                float _LeafWindPhaseScale;
+                float _LeafWindMaskExponent;
+                float4 _LeafWindDirection;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
 
-            half4 SampleAlbedoAlpha(float2 uv)
+            struct ShadowAtt
             {
-                return SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv) * _BaseColor;
+                float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
+                float2 uv         : TEXCOORD0;
+            };
+
+            struct ShadowVar
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv         : TEXCOORD0;
+            };
+
+            ShadowVar ShadowVertLeaf(ShadowAtt input)
+            {
+                ShadowVar output;
+                float3 posWS = TransformObjectToWorld(input.positionOS.xyz);
+                posWS = TreeGeneratorApplyLeafWindWS(
+                    posWS,
+                    input.uv,
+                    _LeafWindEnabled,
+                    _LeafWindStrength,
+                    _LeafWindFrequency,
+                    _LeafWindTurbulence,
+                    _LeafWindPhaseScale,
+                    _LeafWindMaskExponent,
+                    _LeafWindDirection.xyz,
+                    _Time.y);
+                output.positionCS = TransformWorldToHClip(posWS);
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                return output;
+            }
+
+            half4 ShadowFragLeaf(ShadowVar input) : SV_Target
+            {
+                half4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                half4 baseCol = tex * _BaseColor;
+                #if defined(_ALPHATEST_ON)
+                    clip(baseCol.a - _Cutoff);
+                #endif
+                return 0;
             }
             ENDHLSL
         }
     }
 }
-

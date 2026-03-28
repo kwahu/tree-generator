@@ -95,7 +95,7 @@ public class TreeDataEditor : Editor
                 EditorGUILayout.LabelField("Geometria", EditorStyles.miniLabel);
                 DrawProp(b, "segments",    "Max segmentów", "Maksymalna liczba segmentów dla najdłuższej gałęzi.");
                 DrawProp(b, "sides",       "Boki");
-                DrawProp(b, "scaleSegmentsByLength", "Segmenty wg długości", "Najkrótsza gałąź dostaje 1 segment, najdłuższa max.");
+                DrawProp(b, "segmentsByBranchLength", "Segmenty vs długość gałęzi", "X: najkrótsza→najdłuższa główna gałąź w drzewie. Y: udział max segmentów (0..1).");
                 DrawProp(b, "reduceSidesPerSegmentToThree", "Zmniejszaj boki co segment", "Jeśli włączone, boki gałęzi maleją co segment i na końcu osiągają 3.");
                 DrawProp(b, "maxRadius", "Max promień", "Maksymalny promień gałęzi. Wartość 1 na krzywej promienia oznacza dokładnie ten promień.");
                 DrawProp(b, "maxRadiusByStartHeight", "Max promień wg wysokości startu", "Zmienia maksymalny promień zależnie od wysokości początku gałęzi na pniu.");

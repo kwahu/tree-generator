@@ -12,12 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4a2d98340f3436e4486a52f61e80cd8e, type: 3}
   m_Name: NewTreeData 1
   m_EditorClassIdentifier: Assembly-CSharp::TreeData
-  seed: 2
+  seed: 1
   trunk:
-    height: 1
+    height: 5
     segments: 8
     sides: 10
-    maxRadius: 0.05
+    maxRadius: 0.1
     reduceSidesPerSegmentToThree: 1
     radiusCurve:
       serializedVersion: 2
@@ -52,40 +52,40 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    bendAngle: 25.1
+    bendAngle: 22.9
     bendDirection: 0
     twist: 360
   mainBranches:
     enabled: 1
-    count: 6
-    startHeight: 0.317
+    count: 30
+    startHeight: 0.201
     endHeight: 1
     densityCurve:
       serializedVersion: 2
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 1
-        inSlope: -0.6683396
-        outSlope: -0.6683396
+        value: 0
+        inSlope: 2.4408622
+        outSlope: 2.4408622
         tangentMode: 34
         weightedMode: 0
         inWeight: 0
         outWeight: 0.33333334
       - serializedVersion: 3
-        time: 0.36259487
-        value: 0.7576635
-        inSlope: -0.7637664
-        outSlope: -0.7637664
+        time: 0.27154753
+        value: 0.6628101
+        inSlope: 1.4518738
+        outSlope: 1.4518738
         tangentMode: 34
         weightedMode: 0
         inWeight: 0.33333334
         outWeight: 0.33333334
       - serializedVersion: 3
-        time: 1.0025624
-        value: 0.20780768
-        inSlope: -0.85919327
-        outSlope: -0.85919327
+        time: 1
+        value: 1
+        inSlope: 0.4628853
+        outSlope: 0.4628853
         tangentMode: 34
         weightedMode: 0
         inWeight: 0.33333334
@@ -94,10 +94,10 @@ MonoBehaviour:
       m_PostInfinity: 2
       m_RotationOrder: 4
     enforceMinSeparation: 0
-    minHeightSeparation: 0.067
-    minAngularSeparation: 24.9
-    minLength: 0.5
-    maxLength: 1
+    minHeightSeparation: 0.1
+    minAngularSeparation: 31.6
+    minLength: 2
+    maxLength: 3
     lengthByHeight:
       serializedVersion: 2
       m_Curve:
@@ -122,15 +122,38 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    minAngle: 19.4
-    maxAngle: 71.3
+    minAngle: 34.4
+    maxAngle: 55
     bendAmount: 75
     twistAmount: 180
-    segments: 5
-    sides: 5
-    scaleSegmentsByLength: 1
+    segments: 6
+    sides: 4
+    segmentsByBranchLength:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: -0.0040225964
+        value: 0.4948367
+        inSlope: 2.0086017
+        outSlope: 2.0086017
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.061916158
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: -0.257178
+        outSlope: -0.257178
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.18887201
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
     reduceSidesPerSegmentToThree: 1
-    maxRadius: 0.05
+    maxRadius: 0.1
     maxRadiusByStartHeight:
       serializedVersion: 2
       m_Curve:
@@ -190,7 +213,7 @@ MonoBehaviour:
       m_RotationOrder: 4
   subBranches:
     enabled: 1
-    countPerBranch: 6
+    countPerBranch: 10
     countByTrunkHeight:
       serializedVersion: 2
       m_Curve:
@@ -248,13 +271,13 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    startPosition: 0
-    endPosition: 0.503
-    lengthRatio: 0.523
-    minAngle: 5
-    maxAngle: 47
+    startPosition: 0.294
+    endPosition: 0.608
+    lengthRatio: 0.39
+    minAngle: 39.2
+    maxAngle: 88
     bendAmount: 60
-    segments: 10
+    segments: 3
     sides: 3
     radiusCurve:
       serializedVersion: 2
@@ -282,7 +305,7 @@ MonoBehaviour:
       m_RotationOrder: 4
   subBranchesLevel2:
     enabled: 1
-    countPerBranch: 3
+    countPerBranch: 5
     countByParentLength:
       serializedVersion: 2
       m_Curve:
@@ -307,13 +330,13 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    startPosition: 0
-    endPosition: 0.492
-    lengthRatio: 0.519
-    minAngle: 44.5
+    startPosition: 0.4
+    endPosition: 0.862
+    lengthRatio: 0.516
+    minAngle: 42.6
     maxAngle: 88
     bendAmount: 60
-    segments: 3
+    segments: 2
     sides: 3
     radiusCurve:
       serializedVersion: 2
@@ -344,9 +367,9 @@ MonoBehaviour:
     countPerTipMainBranch: 0
     countPerTipSubBranch: 0
     countPerTipSubBranchLevel2: 0
-    alongBranchStart: 0
-    countAlongMainBranch: 10
-    countAlongSubBranch: 20
+    alongBranchStart: 0.212
+    countAlongMainBranch: 40
+    countAlongSubBranch: 27
     countAlongSubBranchLevel2: 15
     alongDistributionMainBranch:
       serializedVersion: 2
@@ -428,7 +451,7 @@ MonoBehaviour:
     countPerNodeMainBranch: 0
     countPerNodeSubBranch: 0
     countPerNodeSubBranchLevel2: 0
-    minSize: 0.05
+    minSize: 0.1
     maxSize: 0.1
     sizeByTreeHeight:
       serializedVersion: 2
@@ -436,17 +459,26 @@ MonoBehaviour:
       - serializedVersion: 3
         time: 0.01902771
         value: 0.49972534
-        inSlope: 1.5252342
-        outSlope: 1.5252342
+        inSlope: 2.1098382
+        outSlope: 2.1098382
         tangentMode: 34
         weightedMode: 0
         inWeight: 0
         outWeight: 0.33333334
       - serializedVersion: 3
-        time: 1.0095062
-        value: 2.010437
-        inSlope: 1.5252342
-        outSlope: 1.5252342
+        time: 0.5006365
+        value: 1.5158421
+        inSlope: 0.52127403
+        outSlope: 0.52127403
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.994339
+        value: 0.9889183
+        inSlope: -1.0672902
+        outSlope: -1.0672902
         tangentMode: 34
         weightedMode: 0
         inWeight: 0.33333334
@@ -480,8 +512,8 @@ MonoBehaviour:
       m_RotationOrder: 4
     spreadAngle: 180
     outwardDirectionCorrelation: 0
-    droop: 0
-    validateUpwardOrientation: 1
+    droop: 1
+    validateUpwardOrientation: 0
     upwardDotThreshold: -1
     minUpwardLeafRatio: 1
     color: {r: 1, g: 0, b: 0.17973852, a: 1}

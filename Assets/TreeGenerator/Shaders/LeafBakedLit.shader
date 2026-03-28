@@ -1,0 +1,169 @@
+Shader "TreeGenerator/Leaf Baked Lit GI Control"
+{
+    Properties
+    {
+        [MainTexture] _BaseMap("Base Map", 2D) = "white" {}
+        [MainColor] _BaseColor("Base Color", Color) = (1,1,1,1)
+        _VertexColorStrength("Vertex Color Strength", Range(0, 1)) = 1
+
+        [Toggle(_ALPHATEST_ON)] _AlphaClip("Alpha Clip", Float) = 1
+        _Cutoff("Alpha Cutoff", Range(0,1)) = 0.5
+
+        [Header(Baked GI Controls)]
+        _GIInfluence("GI Influence", Range(0, 1)) = 1
+        _GIContrast("GI Contrast", Range(0, 2)) = 1
+        _GIBrightness("GI Brightness", Range(-1, 1)) = 0
+    }
+
+    SubShader
+    {
+        Tags
+        {
+            "RenderPipeline" = "UniversalPipeline"
+            "Queue" = "AlphaTest"
+            "RenderType" = "TransparentCutout"
+            "UniversalMaterialType" = "Lit"
+        }
+
+        Pass
+        {
+            Name "UniversalForward"
+            Tags { "LightMode" = "UniversalForward" }
+
+            Blend One Zero
+            ZWrite On
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex vert
+            #pragma fragment frag
+
+            #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile _ _ALPHATEST_ON
+            #pragma multi_compile_fog
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
+                float2 uv         : TEXCOORD0;
+                float2 uv2        : TEXCOORD1;
+                float4 color      : COLOR;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv         : TEXCOORD0;
+                float4 color      : TEXCOORD1;
+                float3 normalWS   : TEXCOORD2;
+                float3 positionWS : TEXCOORD3;
+                DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 4);
+                float fogCoord : TEXCOORD5;
+            };
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseColor;
+                float4 _BaseMap_ST;
+                float _VertexColorStrength;
+                float _Cutoff;
+                float _GIInfluence;
+                float _GIContrast;
+                float _GIBrightness;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+
+            inline half3 ApplyGIControls(half3 gi)
+            {
+                // Contrast around 0.5 + brightness offset.
+                half3 contrasted = (gi - 0.5h) * _GIContrast + 0.5h;
+                contrasted += _GIBrightness;
+                return max(contrasted, 0.0h);
+            }
+
+            Varyings vert(Attributes input)
+            {
+                Varyings output;
+                VertexPositionInputs posInputs = GetVertexPositionInputs(input.positionOS.xyz);
+                VertexNormalInputs normInputs = GetVertexNormalInputs(input.normalOS);
+
+                output.positionCS = posInputs.positionCS;
+                output.positionWS = posInputs.positionWS;
+                output.normalWS = NormalizeNormalPerVertex(normInputs.normalWS);
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                output.color = input.color;
+
+                OUTPUT_LIGHTMAP_UV(input.uv2, unity_LightmapST, output.lightmapUV);
+                OUTPUT_SH(output.normalWS, output.vertexSH);
+
+                output.fogCoord = ComputeFogFactor(posInputs.positionCS.z);
+                return output;
+            }
+
+            half4 frag(Varyings input) : SV_Target
+            {
+                half4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                half4 baseCol = tex * _BaseColor;
+
+                #if defined(_ALPHATEST_ON)
+                    clip(baseCol.a - _Cutoff);
+                #endif
+
+                half3 normalWS = NormalizeNormalPerPixel(input.normalWS);
+                half3 bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, normalWS);
+                half3 tunedGI = ApplyGIControls(bakedGI);
+
+                // 0 = ignore GI (flat albedo), 1 = full tuned GI.
+                half3 giMul = lerp(1.0h.xxx, tunedGI, _GIInfluence);
+
+                half3 vtxTint = lerp(1.0h.xxx, input.color.rgb, _VertexColorStrength);
+                half3 finalRGB = baseCol.rgb * vtxTint * giMul;
+                finalRGB = MixFog(finalRGB, input.fogCoord);
+
+                return half4(finalRGB, baseCol.a);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+            ZWrite On
+            ZTest LEqual
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex ShadowPassVertex
+            #pragma fragment ShadowPassFragment
+            #pragma multi_compile _ _ALPHATEST_ON
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseColor;
+                float4 _BaseMap_ST;
+                float _Cutoff;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+
+            half4 SampleAlbedoAlpha(float2 uv)
+            {
+                return SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv) * _BaseColor;
+            }
+            ENDHLSL
+        }
+    }
+}
+

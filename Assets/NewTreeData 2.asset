@@ -1,0 +1,487 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a2d98340f3436e4486a52f61e80cd8e, type: 3}
+  m_Name: NewTreeData 2
+  m_EditorClassIdentifier: Assembly-CSharp::TreeData
+  seed: 3
+  trunk:
+    height: 5
+    segments: 8
+    sides: 10
+    maxRadius: 0.1
+    reduceSidesPerSegmentToThree: 1
+    radiusCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: -0.0033912659
+        value: 0.991169
+        inSlope: -7.2189474
+        outSlope: -7.2189474
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.095823534
+        value: 0.27494258
+        inSlope: -0.6628145
+        outSlope: -0.6628145
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.07929816
+      - serializedVersion: 3
+        time: 0.99954224
+        value: 0.01210022
+        inSlope: -0.26193777
+        outSlope: -0.26193777
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.22902173
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    bendAngle: 18.6
+    bendDirection: 0
+    twist: 360
+  mainBranches:
+    enabled: 1
+    count: 16
+    startHeight: 0.384
+    endHeight: 1
+    densityCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: -0.6683396
+        outSlope: -0.6683396
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.36259487
+        value: 0.7576635
+        inSlope: -0.7637664
+        outSlope: -0.7637664
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 1.0025624
+        value: 0.20780768
+        inSlope: -0.85919327
+        outSlope: -0.85919327
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    enforceMinSeparation: 1
+    minHeightSeparation: 0.242
+    minAngularSeparation: 62.9
+    minLength: 2
+    maxLength: 3
+    lengthByHeight:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: -0.0060310364
+        value: 0.9964142
+        inSlope: -0.78355473
+        outSlope: -0.78355473
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 1.0010834
+        value: 0.20728493
+        inSlope: -0.78355473
+        outSlope: -0.78355473
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    minAngle: 69.3
+    maxAngle: 86.2
+    bendAmount: 75
+    twistAmount: 180
+    segments: 5
+    sides: 5
+    scaleSegmentsByLength: 1
+    reduceSidesPerSegmentToThree: 1
+    maxRadius: 0.1
+    maxRadiusByStartHeight:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0.007915497
+        value: 1.0023499
+        inSlope: -1.1632171
+        outSlope: -1.1632171
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.4901357
+        value: 0.44142303
+        inSlope: -0.9437653
+        outSlope: -0.9437653
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.996109
+        value: 0.07493973
+        inSlope: -0.72431344
+        outSlope: -0.72431344
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    radiusCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0.10821533
+        value: 1
+        inSlope: -0.9478239
+        outSlope: -0.9478239
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.9976143
+        value: 0.15700635
+        inSlope: -0.9478239
+        outSlope: -0.9478239
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  subBranches:
+    enabled: 1
+    countPerBranch: 10
+    countByTrunkHeight:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: -0.010276794
+        value: -0.0078125
+        inSlope: 1.0914047
+        outSlope: 1.0914047
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 0.4659454
+        value: 0.51193863
+        inSlope: 0.99639845
+        outSlope: 0.99639845
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 1.0102844
+        value: 1.0026016
+        inSlope: 0.9013922
+        outSlope: 0.9013922
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    countByParentLength:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 1
+        outSlope: 1
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 1
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    startPosition: 0
+    endPosition: 0.503
+    lengthRatio: 0.523
+    minAngle: 5
+    maxAngle: 47
+    bendAmount: 60
+    segments: 10
+    sides: 3
+    radiusCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.010958747
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.98776245
+        value: 0.004434326
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  subBranchesLevel2:
+    enabled: 1
+    countPerBranch: 10
+    countByParentLength:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 2
+        outSlope: 2
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    startPosition: 0
+    endPosition: 0.492
+    lengthRatio: 0.519
+    minAngle: 44.5
+    maxAngle: 88
+    bendAmount: 60
+    segments: 3
+    sides: 3
+    radiusCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.012
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0.002
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  leaves:
+    enabled: 1
+    countPerTipMainBranch: 0
+    countPerTipSubBranch: 0
+    countPerTipSubBranchLevel2: 0
+    alongBranchStart: 0.519
+    countAlongMainBranch: 39
+    countAlongSubBranch: 20
+    countAlongSubBranchLevel2: 9
+    alongDistributionMainBranch:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    alongDistributionSubBranch:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    alongDistributionSubBranchLevel2:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    enforceMinSeparation: 0
+    minSeparationMainBranch: 0.01
+    minSeparationSubBranch: 0.06
+    minSeparationSubBranchLevel2: 0.05
+    placementAttemptsPerLeaf: 1
+    countPerNodeMainBranch: 0
+    countPerNodeSubBranch: 0
+    countPerNodeSubBranchLevel2: 0
+    minSize: 0.1
+    maxSize: 0.15
+    sizeByTreeHeight:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0.01902771
+        value: 0.49972534
+        inSlope: 1.5252342
+        outSlope: 1.5252342
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 1.0095062
+        value: 2.010437
+        inSlope: 1.5252342
+        outSlope: 1.5252342
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    sizeByDistanceFromTrunk:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: -0.0000076293945
+        value: 1.5046692
+        inSlope: -1.474827
+        outSlope: -1.474827
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 1.0198132
+        value: 0.0006098747
+        inSlope: -1.474827
+        outSlope: -1.474827
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    spreadAngle: 180
+    outwardDirectionCorrelation: 0
+    droop: 0
+    validateUpwardOrientation: 1
+    upwardDotThreshold: -1
+    minUpwardLeafRatio: 1
+    color: {r: 1, g: 0, b: 0.17973852, a: 1}

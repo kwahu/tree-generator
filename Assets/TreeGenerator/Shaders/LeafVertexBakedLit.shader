@@ -1,12 +1,12 @@
-Shader "TreeGenerator/Leaf Baked Lit GI Control_"
+Shader "TreeGenerator/Leaf Vertex Baked Lit"
 {
     Properties
     {
         [MainTexture] _BaseMap("Base Map", 2D) = "white" {}
         [MainColor] _BaseColor("Base Color", Color) = (1,1,1,1)
 
-        [Header(Baked GI Controls)]
-        _GIInfluence("GI Influence", Range(0, 1)) = 1
+        [Header(Baked lighting in vertex color)]
+        _GIInfluence("Vertex GI Influence", Range(0, 1)) = 1
         _GIContrast("GI Contrast", Range(0, 2)) = 1
         _GIBrightness("GI Brightness", Range(-1, 1)) = 0
 
@@ -43,13 +43,9 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control_"
             #pragma target 3.0
             #pragma vertex vert
             #pragma fragment frag
-
-            #pragma multi_compile _ LIGHTMAP_ON
-            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
             #pragma multi_compile_fog
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "LeafWind.hlsl"
 
             struct Attributes
@@ -57,7 +53,6 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control_"
                 float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
                 float2 uv         : TEXCOORD0;
-                float2 uv2        : TEXCOORD1;
                 float4 color      : COLOR;
             };
 
@@ -65,11 +60,9 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control_"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv         : TEXCOORD0;
-                float3 normalWS   : TEXCOORD1;
-                float3 positionWS : TEXCOORD2;
-                DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 3);
-                float fogCoord : TEXCOORD4;
-                half4 vertexColor : TEXCOORD5;
+                float3 positionWS : TEXCOORD1;
+                half4 vertexColor : TEXCOORD2;
+                float fogCoord    : TEXCOORD3;
             };
 
             CBUFFER_START(UnityPerMaterial)
@@ -90,17 +83,16 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control_"
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
 
-            inline half3 ApplyGIControls(half3 gi)
+            // Vertex colors hold linear irradiance (HDR). Do not use (gi - 0.5) — that is for ~LDR lightmap GI tuning.
+            inline half3 ApplyVertexBakedGIControls(half3 gi)
             {
-                half3 contrasted = (gi - 0.5h) * _GIContrast + 0.5h;
-                contrasted += _GIBrightness;
-                return max(contrasted, 0.0h);
+                half3 t = gi * _GIContrast + half3(_GIBrightness, _GIBrightness, _GIBrightness);
+                return max(t, 0.0h);
             }
 
             Varyings vert(Attributes input)
             {
                 Varyings output;
-                VertexNormalInputs normInputs = GetVertexNormalInputs(input.normalOS);
 
                 float3 posWS = TransformObjectToWorld(input.positionOS.xyz);
                 posWS = TreeGeneratorApplyLeafWindWS(
@@ -117,14 +109,9 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control_"
 
                 output.positionCS = TransformWorldToHClip(posWS);
                 output.positionWS = posWS;
-                output.normalWS = NormalizeNormalPerVertex(normInputs.normalWS);
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
-
-                OUTPUT_LIGHTMAP_UV(input.uv2, unity_LightmapST, output.lightmapUV);
-                OUTPUT_SH(output.normalWS, output.vertexSH);
-
-                output.fogCoord = ComputeFogFactor(output.positionCS.z);
                 output.vertexColor = half4(input.color);
+                output.fogCoord = ComputeFogFactor(output.positionCS.z);
                 return output;
             }
 
@@ -133,15 +120,11 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control_"
                 half4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
                 half4 baseCol = tex * _BaseColor;
 
-                half3 normalWS = NormalizeNormalPerPixel(input.normalWS);
-                half3 bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, normalWS);
-                half3 tunedGI = ApplyGIControls(bakedGI);
-
+                half3 baked = input.vertexColor.rgb;
+                half3 tunedGI = ApplyVertexBakedGIControls(baked);
                 half3 giMul = lerp(1.0h.xxx, tunedGI, _GIInfluence);
 
-                // Vertex colors (e.g. procedural tint / vertex bake); defaults to white when mesh has no colors.
-                half3 finalRGB = baseCol.rgb * input.vertexColor.rgb * giMul;
-
+                half3 finalRGB = baseCol.rgb * giMul;
                 finalRGB = MixFog(finalRGB, input.fogCoord);
 
                 return half4(finalRGB, baseCol.a);

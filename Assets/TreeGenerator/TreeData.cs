@@ -369,6 +369,6 @@ public class LeafSettings
     [Tooltip("Minimum fraction of upward-oriented leaves required to pass the check.")]
     public float minUpwardLeafRatio = 0.6f;
 
-    [Tooltip("Vertex color applied to leaf quads (use with a vertex-color shader).")]
-    public Color color = new Color(0.18f, 0.55f, 0.12f, 1f);
+    [Tooltip("Reserved for future use; generated leaf meshes use white vertex colors so lightmap→vertex bakes show irradiance clearly.")]
+    public Color color = Color.white;
 }

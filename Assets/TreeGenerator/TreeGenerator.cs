@@ -21,11 +21,14 @@ public class TreeGenerator : MonoBehaviour
     public Material treeMaterial;
     public Material leafMaterial;
     public Material clusterLeafMaterial;
+    [Header("Vertex lighting (import z lightmapy)")]
+    [Tooltip("Materiał ze shaderem TreeGenerator/Leaf Vertex Baked Lit — używany po konwersji lightmapy do kolorów wierzchołków (przycisk w inspektorze).")]
+    public Material leafMaterialVertexBaked;
     public bool forceLeafNormalsToSun = true;
     [Range(0f, 0.8f)] public float leafBakeMinSunDot = 0.2f;
     [Min(0.01f)] public float woodUvWorldSize = 0.25f;
-    [Header("Wiatr liści (URP: TreeGenerator/Leaf Baked Lit, Leaf Billboard Opaque)")]
-    [Tooltip("Wymaga materiału z powyższymi shaderami. Parametry co klatkę trafiają do MaterialPropertyBlock na wszystkich MeshRendererach pod tym obiektem.")]
+    [Header("Wiatr liści (URP: Leaf Baked Lit / Leaf Vertex Baked Lit / Leaf Billboard Opaque)")]
+    [Tooltip("Tylko siatka LOD0 (ten sam GameObject co TreeGenerator). Na LOD1+ (_AutoLOD_*, billboardy) wiatr jest wyłączany w MaterialPropertyBlock.")]
     public bool leafWindEnabled = false;
     [Min(0f)] public float leafWindStrength = 0.12f;
     [Min(0f)] public float leafWindFrequency = 2f;
@@ -156,6 +159,7 @@ public class TreeGenerator : MonoBehaviour
     private readonly List<int>     _clusterLeafTris = new List<int>();
     private List<MeshRenderer> _leafWindTargets;
     private MaterialPropertyBlock _leafWindPropertyBlock;
+    private MaterialPropertyBlock _leafWindPropertyBlockDisabled;
     private bool _leafWindAppliedLastFrame;
     private static readonly int LeafWindEnabledId = Shader.PropertyToID("_LeafWindEnabled");
     private static readonly int LeafWindStrengthId = Shader.PropertyToID("_LeafWindStrength");
@@ -253,7 +257,7 @@ public class TreeGenerator : MonoBehaviour
         if (_leafWindTargets == null || _leafWindTargets.Count == 0)
             RefreshLeafWindTargets();
 
-        EnsureLeafWindPropertyBlock();
+        EnsureLeafWindPropertyBlocks();
         Vector3 dir = leafWindDirection.sqrMagnitude > 1e-8f
             ? leafWindDirection.normalized
             : Vector3.right;
@@ -266,9 +270,21 @@ public class TreeGenerator : MonoBehaviour
         _leafWindPropertyBlock.SetVector(LeafWindDirectionId, new Vector4(dir.x, dir.y, dir.z, 0f));
 
         for (int i = 0; i < _leafWindTargets.Count; i++)
-            ApplyLeafWindPropertyBlockToRenderer(_leafWindTargets[i]);
+        {
+            MeshRenderer mr = _leafWindTargets[i];
+            if (IsLeafWindLod0Renderer(mr))
+                ApplyLeafWindPropertyBlockToRenderer(mr, _leafWindPropertyBlock);
+            else
+                ApplyLeafWindPropertyBlockToRenderer(mr, _leafWindPropertyBlockDisabled);
+        }
 
         _leafWindAppliedLastFrame = true;
+    }
+
+    /// <summary>True for the root tree mesh (LOD0). Child LOD meshes live under __AutoLOD_* and must not use vertex wind.</summary>
+    private bool IsLeafWindLod0Renderer(MeshRenderer mr)
+    {
+        return mr != null && mr.gameObject == gameObject;
     }
 
     private void RefreshLeafWindTargets()
@@ -278,20 +294,25 @@ public class TreeGenerator : MonoBehaviour
         _leafWindTargets.AddRange(GetComponentsInChildren<MeshRenderer>(true));
     }
 
-    private void EnsureLeafWindPropertyBlock()
+    private void EnsureLeafWindPropertyBlocks()
     {
         _leafWindPropertyBlock ??= new MaterialPropertyBlock();
+        if (_leafWindPropertyBlockDisabled == null)
+        {
+            _leafWindPropertyBlockDisabled = new MaterialPropertyBlock();
+            _leafWindPropertyBlockDisabled.SetFloat(LeafWindEnabledId, 0f);
+        }
     }
 
-    private void ApplyLeafWindPropertyBlockToRenderer(MeshRenderer mr)
+    private static void ApplyLeafWindPropertyBlockToRenderer(MeshRenderer mr, MaterialPropertyBlock mpb)
     {
-        if (mr == null)
+        if (mr == null || mpb == null)
             return;
         Material[] mats = mr.sharedMaterials;
         if (mats == null || mats.Length == 0)
             return;
         for (int i = 0; i < mats.Length; i++)
-            mr.SetPropertyBlock(_leafWindPropertyBlock, i);
+            mr.SetPropertyBlock(mpb, i);
     }
 
     private void ClearLeafWindPropertyBlocksOnAllTargets()
@@ -1538,7 +1559,8 @@ public class TreeGenerator : MonoBehaviour
             float representedT = Mathf.InverseLerp(1f, 100f, isClusteredLeaf ? requestedGroupLeaves : representedLeaves);
             float coverageScale = Mathf.Lerp(1f, 2.25f, representedT);
             float finalSize = size * clusterSizeFactor * coverageScale;
-            Color leafColor = ApplyClusterDebugTint(ls.color, isClusteredLeaf ? requestedGroupLeaves : representedLeaves, isClusteredLeaf);
+            // White vertex base so lightmap→vertex multiply shows irradiance directly (TreeData leaf color not applied here).
+            Color leafColor = ApplyClusterDebugTint(Color.white, isClusteredLeaf ? requestedGroupLeaves : representedLeaves, isClusteredLeaf);
             AddLeafQuad(stem, leafDir, radial, finalSize, leafColor, target, isClusteredLeaf);
             generated += representedLeaves;
 
@@ -1589,7 +1611,8 @@ public class TreeGenerator : MonoBehaviour
             float representedT = Mathf.InverseLerp(1f, 100f, isClusteredLeaf ? requestedGroupLeaves : representedLeaves);
             float coverageScale = Mathf.Lerp(1f, 2.25f, representedT);
             float finalSize = size * clusterSizeFactor * coverageScale;
-            Color leafColor = ApplyClusterDebugTint(ls.color, isClusteredLeaf ? requestedGroupLeaves : representedLeaves, isClusteredLeaf);
+            // White vertex base so lightmap→vertex multiply shows irradiance directly (TreeData leaf color not applied here).
+            Color leafColor = ApplyClusterDebugTint(Color.white, isClusteredLeaf ? requestedGroupLeaves : representedLeaves, isClusteredLeaf);
             AddLeafQuad(stem, leafDir, radial, finalSize, leafColor, target, isClusteredLeaf);
 
             if (placedLeafStems != null)
@@ -1619,7 +1642,8 @@ public class TreeGenerator : MonoBehaviour
             float representedT = Mathf.InverseLerp(1f, 100f, isClusteredLeaf ? requestedGroupLeaves : representedLeaves);
             float coverageScale = Mathf.Lerp(1f, 2.25f, representedT);
             float finalSize = size * clusterSizeFactor * coverageScale;
-            Color leafColor = ApplyClusterDebugTint(ls.color, isClusteredLeaf ? requestedGroupLeaves : representedLeaves, isClusteredLeaf);
+            // White vertex base so lightmap→vertex multiply shows irradiance directly (TreeData leaf color not applied here).
+            Color leafColor = ApplyClusterDebugTint(Color.white, isClusteredLeaf ? requestedGroupLeaves : representedLeaves, isClusteredLeaf);
             AddLeafQuad(stem, leafDir, radial, finalSize, leafColor, target, isClusteredLeaf);
 
             if (placedLeafStems != null)
@@ -1823,8 +1847,9 @@ public class TreeGenerator : MonoBehaviour
             return baseColor;
 
         float t = Mathf.InverseLerp(1f, 100f, representedLeaves);
-        Color debugRed = new Color(1f, 0.22f, 0.22f, baseColor.a);
-        Color tinted = Color.Lerp(baseColor, debugRed, Mathf.Lerp(0.5f, 0.9f, t));
+        // Visible clustered-leaf tint (avoid red/magenta — reads like missing-shader pink in scene view).
+        Color clusterTint = new Color(0.35f, 0.82f, 0.38f, baseColor.a);
+        Color tinted = Color.Lerp(baseColor, clusterTint, Mathf.Lerp(0.35f, 0.72f, t));
         tinted.a = baseColor.a;
         return tinted;
     }
@@ -2235,6 +2260,26 @@ public class TreeGenerator : MonoBehaviour
             lastUpwardLeafCheckPassed = lastUpwardLeafRatio >= leaves.minUpwardLeafRatio;
     }
 
+    /// <summary>
+    /// After external edits to <see cref="MeshFilter.sharedMesh"/> (e.g. editor vertex color tools), syncs
+    /// <see cref="_mesh"/> and <see cref="_colors"/> so the next <see cref="Generate"/> does not resurrect a stale mesh reference or white colors from the last in-memory build.
+    /// </summary>
+    public void SyncMeshAndColorsFromMeshFilter()
+    {
+        MeshFilter mf = GetComponent<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null)
+            return;
+        Mesh mesh = mf.sharedMesh;
+        _mesh = mesh;
+        _colors.Clear();
+        mesh.GetColors(_colors);
+        int vc = mesh.vertexCount;
+        while (_colors.Count < vc)
+            _colors.Add(Color.white);
+        while (_colors.Count > vc)
+            _colors.RemoveAt(_colors.Count - 1);
+    }
+
     private void RegisterLeafNormal(Vector3 leafNormal)
     {
         _checkedLeafCount++;
@@ -2303,6 +2348,7 @@ public class TreeGenerator : MonoBehaviour
     private void GenerateLightmapUvForMesh(Mesh mesh)
     {
         if (mesh == null) return;
+        UnityEditor.Undo.RecordObject(mesh, "Generate Lightmap UVs");
         UnityEditor.Unwrapping.GenerateSecondaryUVSet(mesh);
         UnityEditor.EditorUtility.SetDirty(mesh);
     }

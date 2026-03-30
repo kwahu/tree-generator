@@ -998,7 +998,7 @@ public static class LeafVolumeMesher
 
         Consume(leafTrisA);
         Consume(leafTrisB);
-        return count > 0 ? (sum / count) : new Color(0.2f, 0.6f, 0.2f, 1f);
+        return count > 0 ? (sum / count) : Color.white;
     }
 }
 

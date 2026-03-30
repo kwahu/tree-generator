@@ -368,9 +368,9 @@ MonoBehaviour:
     countPerTipSubBranch: 0
     countPerTipSubBranchLevel2: 0
     alongBranchStart: 0.212
-    countAlongMainBranch: 40
-    countAlongSubBranch: 27
-    countAlongSubBranchLevel2: 15
+    countAlongMainBranch: 25
+    countAlongSubBranch: 0
+    countAlongSubBranchLevel2: 0
     alongDistributionMainBranch:
       serializedVersion: 2
       m_Curve:

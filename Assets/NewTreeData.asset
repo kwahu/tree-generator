@@ -355,13 +355,13 @@ MonoBehaviour:
       m_RotationOrder: 4
   leaves:
     enabled: 1
-    countPerTipMainBranch: 0
-    countPerTipSubBranch: 0
-    countPerTipSubBranchLevel2: 0
-    alongBranchStart: 0.212
-    countAlongMainBranch: 40
-    countAlongSubBranch: 27
-    countAlongSubBranchLevel2: 15
+    countPerTipMainBranch: 2
+    countPerTipSubBranch: 3
+    countPerTipSubBranchLevel2: 2
+    alongBranchStart: 0.249
+    countAlongMainBranch: 38
+    countAlongSubBranch: 23
+    countAlongSubBranchLevel2: 11
     alongDistributionMainBranch:
       serializedVersion: 2
       m_Curve:

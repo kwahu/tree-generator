@@ -197,7 +197,7 @@ public class TreeDataEditor : Editor
                 DrawProp(l, "upwardDotThreshold", "Próg dot ku górze", "Liść uznawany za skierowany ku górze, gdy dot(kierunek, worldUp) przekracza ten próg.");
                 DrawProp(l, "minUpwardLeafRatio", "Min udział liści ku górze", "Minimalny udział liści skierowanych ku górze wymagany do zaliczenia testu.");
                 EditorGUILayout.Space(4);
-                DrawProp(l, "color", "Kolor wierzchołka",   "Kolor wierzchołkowy liści – widoczny z shaderem vertex-color.");
+                DrawProp(l, "color", "Kolor wierzchołka (zarezerwowane)", "Obecnie generowanie mesha ustawia liściom biały vertex color (mnożenie lightmapy). Pole zostawione na przyszłość.");
             }
         }
         EndSection();

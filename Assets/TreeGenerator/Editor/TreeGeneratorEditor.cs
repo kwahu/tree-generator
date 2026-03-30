@@ -5,6 +5,14 @@ using UnityEngine;
 public class TreeGeneratorEditor : Editor
 {
     private static int _lodInspectorTab;
+    private static bool _vertexBakeClearLightmap = false;
+    private static bool _vertexBakeApplyMaterial = true;
+    private const string PrefsLeafNatureGlobalBlend = "TreeGenerator.LeafNatureGlobalBlend";
+    private const string PrefsLeafNatureHeight = "TreeGenerator.LeafNatureHeight";
+    private const string PrefsLeafNatureRadial = "TreeGenerator.LeafNatureRadial";
+    private const string PrefsLeafNatureSun = "TreeGenerator.LeafNatureSun";
+    /// <summary>Stary klucz — odczyt przy pierwszym braku GlobalBlend.</summary>
+    private const string PrefsLeafNatureInfluenceLegacy = "TreeGenerator.LeafNatureInfluence";
 
     private static readonly string[] LodTabNames =
     {
@@ -76,7 +84,7 @@ public class TreeGeneratorEditor : Editor
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Wiatr liści (vertex shader)", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Materiały: shadery „TreeGenerator/Leaf Baked Lit…” i „…Leaf Billboard Opaque”. Parametry idą w MaterialPropertyBlock na wszystkie MeshRenderery pod drzewem (LOD, billboardy).",
+            "Materiały: shadery „TreeGenerator/Leaf Baked Lit…” i „…Leaf Billboard Opaque”. Wiatr vertexowy tylko na LOD0 (główny MeshRenderer tego obiektu); na __AutoLOD_* i billboardach MPB ustawia _LeafWindEnabled = 0.",
             MessageType.None);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("leafWindEnabled"),
             new GUIContent("Włącz wiatr"));
@@ -96,6 +104,133 @@ public class TreeGeneratorEditor : Editor
                 new GUIContent("Kierunek wiatru (świat)"));
         }
         EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Vertex lighting (lightmap do kolorów)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Po bake sceny: próbkuje lightmapę w UV1 (lightmap) i zapisuje wynik przez Mesh.SetColors + odtworzenie UV + SyncMeshAndColorsFromMeshFilter. Konwersja nie regeneruje automatycznie UV lightmapy, żeby nie zmieniać mapowania użytego do próbkowania. Konwersja: delayCall.",
+            MessageType.None);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leafMaterialVertexBaked"),
+            new GUIContent("Materiał liści (Vertex Baked)", "Leaf Vertex Baked Lit — podstawiany na sloty liści po konwersji, jeśli włączone poniżej."));
+        _vertexBakeClearLightmap = EditorGUILayout.Toggle(
+            new GUIContent("Wyzeruj lightmapIndex na rendererze", "Opcjonalnie: usuwa przypisanie do atlasu lightmapy (zwolnienie slotu). Domyślnie wyłączone — zachowuje bake i UV do dalszych testów bez ponownego Generate / Lightmap Bake."),
+            _vertexBakeClearLightmap);
+        _vertexBakeApplyMaterial = EditorGUILayout.Toggle(
+            new GUIContent("Podstaw materiał liści (Vertex Baked)", "Slot 1–3 (lub pojedynczy billboard): leafMaterialVertexBaked."),
+            _vertexBakeApplyMaterial);
+        if (GUILayout.Button("Konwertuj lightmapę na vertex colors (wszystkie meshe pod drzewem)"))
+        {
+            if (gen.leafMaterialVertexBaked == null && _vertexBakeApplyMaterial)
+            {
+                EditorUtility.DisplayDialog(
+                    "TreeGenerator",
+                    "Ustaw materiał „Materiał liści (Vertex Baked)” albo wyłącz „Podstaw materiał liści”.",
+                    "OK");
+            }
+            else
+            {
+                Transform bakeRoot = gen.transform;
+                bool clearLm = _vertexBakeClearLightmap;
+                bool applyLeafMat = _vertexBakeApplyMaterial && gen.leafMaterialVertexBaked != null;
+                Material leafVertexMat = gen.leafMaterialVertexBaked;
+                EditorApplication.delayCall += () =>
+                {
+                    if (bakeRoot == null) return;
+                    LightmapToVertexColorConverter.BakeResult r = LightmapToVertexColorConverter.BakeUnderTransform(
+                        bakeRoot,
+                        clearLm,
+                        applyLeafMat,
+                        leafVertexMat);
+                    string msg = $"Przetworzono: {r.RenderersProcessed}, pominięto: {r.RenderersSkipped}.";
+                    if (r.Warnings.Count > 0)
+                        msg += "\n\n" + string.Join("\n", r.Warnings);
+                    EditorUtility.DisplayDialog("Lightmap do vertex colors", msg, "OK");
+                };
+            }
+        }
+
+        // Suwaki wariacji / test używają EditorPrefs — muszą być poza tym BeginChangeCheck, inaczej
+        // przesunięcie suwaka ustawia „zmianę” i przy włączonej auto-aktualizacji wywołuje Generate(),
+        // co przebudowuje mesh i kasuje kolory z bake'a lightmapy (niezależnie od mieszania).
+        bool serializedSettingsChangedPartA = EditorGUI.EndChangeCheck();
+
+        EditorGUILayout.HelpBox(
+            "Test uruchamiany po zakończeniu inspektora (delayCall), żeby auto „Generuj” nie nadpisało meshu w tej samej klatce. Indeksy liści: Mesh.GetIndices (UInt32 + UInt16). SetColors + SyncMeshAndColorsFromMeshFilter. Pomija *_VertexLitCompare.",
+            MessageType.None);
+        if (GUILayout.Button("Test: losowe vertex colors na liściach"))
+        {
+            // Run after full inspector pass (ApplyModifiedProperties + auto Generate), or the same-frame
+            // gen.Generate() from auto-update will overwrite mesh.colors with fresh white _colors.
+            Transform root = gen.transform;
+            EditorApplication.delayCall += () =>
+            {
+                if (root == null) return;
+                LeafVertexColorRandomTest.TestResult tr = LeafVertexColorRandomTest.ApplyRandomLeafVertexColors(root);
+                string msg = $"Zapisano w meshach: {tr.MeshesProcessed}.";
+                if (tr.Messages.Count > 0)
+                    msg += "\n\n" + string.Join("\n", tr.Messages);
+                EditorUtility.DisplayDialog("Test vertex colors (liście)", msg, "OK");
+            };
+        }
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Wariacja naturalna kolorów liści (vertex)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Mieszanie: oryginalny vertex color → kolor po mnożnikach (wysokość, od pnia, słońce). Osobne suwaki sterują siłą każdego aspektu; przy 0 dany aspekt nie zmienia mnożnika (×1). Pomija *_VertexLitCompare; delayCall. Suwaki nie uruchamiają „Auto aktualizacja”.",
+            MessageType.None);
+
+        float globalBlend = ReadLeafNatureGlobalBlendPref();
+        globalBlend = EditorGUILayout.Slider(
+            new GUIContent(
+                "Mieszanie: oryginał → wariacja",
+                "0 = zostaw istniejące kolory. 1 = pełny efekt bazowy. Do 10 = wielokrotne wzmocnienie miksu."),
+            globalBlend,
+            0f,
+            10f);
+        EditorPrefs.SetFloat(PrefsLeafNatureGlobalBlend, globalBlend);
+
+        float wHeight = EditorPrefs.GetFloat(PrefsLeafNatureHeight, 1f);
+        wHeight = EditorGUILayout.Slider(
+            new GUIContent("Aspekt: wysokość w koronie", "0 = wyłączony. 1 = efekt bazowy. Do 10 = mocniejsze podbicie tego aspektu."),
+            wHeight,
+            0f,
+            10f);
+        EditorPrefs.SetFloat(PrefsLeafNatureHeight, wHeight);
+
+        float wRadial = EditorPrefs.GetFloat(PrefsLeafNatureRadial, 1f);
+        wRadial = EditorGUILayout.Slider(
+            new GUIContent("Aspekt: odległość od osi pnia (XZ)", "0 = wyłączony. 1 = efekt bazowy. Do 10 = mocniejsze różnicowanie rdzeń/obrzeże."),
+            wRadial,
+            0f,
+            10f);
+        EditorPrefs.SetFloat(PrefsLeafNatureRadial, wRadial);
+
+        float wSun = EditorPrefs.GetFloat(PrefsLeafNatureSun, 1f);
+        wSun = EditorGUILayout.Slider(
+            new GUIContent("Aspekt: ekspozycja / słońce", "0 = wyłączony. 1 = efekt bazowy. Do 10 = mocniejsze różnicowanie oświetlenia."),
+            wSun,
+            0f,
+            10f);
+        EditorPrefs.SetFloat(PrefsLeafNatureSun, wSun);
+
+        if (GUILayout.Button("Dołóż naturalną wariację do kolorów liści (vertex)"))
+        {
+            float gb = ReadLeafNatureGlobalBlendPref();
+            float h = EditorPrefs.GetFloat(PrefsLeafNatureHeight, 1f);
+            float rad = EditorPrefs.GetFloat(PrefsLeafNatureRadial, 1f);
+            float sun = EditorPrefs.GetFloat(PrefsLeafNatureSun, 1f);
+            Transform root = gen.transform;
+            EditorApplication.delayCall += () =>
+            {
+                if (root == null) return;
+                LeafVertexNaturalVariation.VariationResult vr = LeafVertexNaturalVariation.Apply(root, gb, h, rad, sun);
+                string msg =
+                    $"Przetworzono meshy: {vr.MeshesProcessed}.\nMieszanie: {gb:P0}, wysokość: {h:P0}, od pnia: {rad:P0}, słońce: {sun:P0}.";
+                if (vr.Messages.Count > 0)
+                    msg += "\n\n" + string.Join("\n", vr.Messages);
+                EditorUtility.DisplayDialog("Wariacja naturalna (liście)", msg, "OK");
+            };
+        }
+        EditorGUILayout.Space(4);
+
+        EditorGUI.BeginChangeCheck();
         EditorGUILayout.PropertyField(serializedObject.FindProperty("autoUpdateWhenValid"),
             new GUIContent("Auto aktualizacja",
                 "Automatycznie przebudowuje drzewo podczas edycji parametrów, tylko jeśli są poprawne."));
@@ -128,7 +263,8 @@ public class TreeGeneratorEditor : Editor
             }
             EditorGUILayout.EndVertical();
         }
-        bool generatorSettingsChanged = EditorGUI.EndChangeCheck();
+        bool serializedSettingsChangedPartB = EditorGUI.EndChangeCheck();
+        bool generatorSettingsChanged = serializedSettingsChangedPartA || serializedSettingsChangedPartB;
         serializedObject.ApplyModifiedProperties();
 
         bool hasValidData = gen.TryValidateSettings(out string validationMessage);
@@ -399,5 +535,14 @@ public class TreeGeneratorEditor : Editor
             EditorGUILayout.PropertyField(so.FindProperty("lodLightmapScaleBiasToLod0"),
                 new GUIContent("Bias do LOD0", "Dodatkowo zbliża Scale In Lightmap do 1.0 dla dalszych LOD (większa wartość = wolniejsza degradacja)."));
         }
+    }
+
+    private static float ReadLeafNatureGlobalBlendPref()
+    {
+        if (EditorPrefs.HasKey(PrefsLeafNatureGlobalBlend))
+            return EditorPrefs.GetFloat(PrefsLeafNatureGlobalBlend, 0.35f);
+        if (EditorPrefs.HasKey(PrefsLeafNatureInfluenceLegacy))
+            return EditorPrefs.GetFloat(PrefsLeafNatureInfluenceLegacy, 0.35f);
+        return 0.35f;
     }
 }

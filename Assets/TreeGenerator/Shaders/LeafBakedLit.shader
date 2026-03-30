@@ -14,6 +14,11 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
         _GIContrast("GI Contrast", Range(0, 2)) = 1
         _GIBrightness("GI Brightness", Range(-1, 1)) = 0
 
+        [Header(Baked GI Lightmap Transmission)]
+        _GITransmission("GI Transmission (lightmap only)", Range(0, 1)) = 0.35
+        _GITransmissionTint("GI Transmission Tint", Color) = (0.75, 0.95, 0.55, 1)
+        _GITransmissionBoost("GI Transmission Boost", Range(0, 1)) = 0.12
+
         [Header(Leaf Wind)]
         _LeafWindEnabled("Leaf Wind Enabled", Float) = 0
         _LeafWindStrength("Wind Strength", Float) = 0.12
@@ -85,6 +90,9 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
                 float _GIInfluence;
                 float _GIContrast;
                 float _GIBrightness;
+                float _GITransmission;
+                float4 _GITransmissionTint;
+                float _GITransmissionBoost;
                 float _LeafWindEnabled;
                 float _LeafWindStrength;
                 float _LeafWindFrequency;
@@ -179,7 +187,14 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
                 float4 _BaseMap_ST;
+                float _VertexColorStrength;
                 float _Cutoff;
+                float _GIInfluence;
+                float _GIContrast;
+                float _GIBrightness;
+                float _GITransmission;
+                float4 _GITransmissionTint;
+                float _GITransmissionBoost;
                 float _LeafWindEnabled;
                 float _LeafWindStrength;
                 float _LeafWindFrequency;
@@ -233,6 +248,68 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
                     clip(baseCol.a - _Cutoff);
                 #endif
                 return 0;
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "Meta"
+            Tags { "LightMode" = "Meta" }
+
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma target 2.0
+            #pragma vertex UniversalVertexMeta
+            #pragma fragment LeafFragmentMeta
+
+            #pragma multi_compile _ _ALPHATEST_ON
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UniversalMetaPass.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseColor;
+                float4 _BaseMap_ST;
+                float _VertexColorStrength;
+                float _Cutoff;
+                float _GIInfluence;
+                float _GIContrast;
+                float _GIBrightness;
+                float _GITransmission;
+                float4 _GITransmissionTint;
+                float _GITransmissionBoost;
+                float _LeafWindEnabled;
+                float _LeafWindStrength;
+                float _LeafWindFrequency;
+                float _LeafWindTurbulence;
+                float _LeafWindPhaseScale;
+                float _LeafWindMaskExponent;
+                float4 _LeafWindDirection;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+
+            half4 LeafFragmentMeta(Varyings input) : SV_Target
+            {
+                half4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                half4 baseCol = tex * _BaseColor;
+
+                #if defined(_ALPHATEST_ON)
+                    clip(baseCol.a - _Cutoff);
+                #endif
+
+                half3 baseAlbedo = baseCol.rgb;
+                half3 transmission = baseAlbedo * _GITransmissionTint.rgb
+                    + _GITransmissionBoost * _GITransmissionTint.rgb;
+                half3 metaAlbedo = lerp(baseAlbedo, transmission, _GITransmission);
+
+                MetaInput metaInput;
+                metaInput.Albedo = metaAlbedo;
+                metaInput.Emission = half3(0, 0, 0);
+                return UniversalFragmentMeta(input, metaInput);
             }
             ENDHLSL
         }

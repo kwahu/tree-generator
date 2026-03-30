@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 /// <summary>
 /// Procedural tree mesh generator.
@@ -796,6 +799,9 @@ public class TreeGenerator : MonoBehaviour
         IReadOnlyList<int> woodTrianglesByLod,
         IReadOnlyList<int> leafTrianglesByLod)
     {
+#if !UNITY_EDITOR
+        return;
+#else
         if (!autoLodScaleInLightmap || lodRenderersPerLevel == null || lodRenderersPerLevel.Count == 0)
             return;
 
@@ -809,10 +815,7 @@ public class TreeGenerator : MonoBehaviour
                 for (int g = 0; g < group.Length; g++)
                 {
                     if (group[g] is MeshRenderer meshRenderer)
-                    {
-                        meshRenderer.scaleInLightmap = scale;
-                        meshRenderer.stitchLightmapSeams = true;
-                    }
+                        SetMeshRendererLightmapBakeResolution(meshRenderer, scale);
                 }
             }
 
@@ -862,13 +865,34 @@ public class TreeGenerator : MonoBehaviour
             for (int g = 0; g < group.Length; g++)
             {
                 if (group[g] is MeshRenderer meshRenderer)
-                {
-                    meshRenderer.scaleInLightmap = scale;
-                    meshRenderer.stitchLightmapSeams = true;
-                }
+                    SetMeshRendererLightmapBakeResolution(meshRenderer, scale);
             }
         }
+#endif
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// Unity 6+ no longer exposes <see cref="MeshRenderer"/> lightmap scale / stitch on the public scripting API;
+    /// values are editor-only serialized fields.
+    /// </summary>
+    private static void SetMeshRendererLightmapBakeResolution(MeshRenderer meshRenderer, float scaleInLightmap)
+    {
+        SerializedObject so = new SerializedObject(meshRenderer);
+        SerializedProperty scaleProp = so.FindProperty("m_ScaleInLightmap");
+        if (scaleProp != null)
+            scaleProp.floatValue = scaleInLightmap;
+        SerializedProperty stitchProp = so.FindProperty("m_StitchLightmapSeams");
+        if (stitchProp != null)
+        {
+            if (stitchProp.propertyType == SerializedPropertyType.Boolean)
+                stitchProp.boolValue = true;
+            else
+                stitchProp.intValue = 1;
+        }
+        so.ApplyModifiedProperties();
+    }
+#endif
 
     private float GetManualLodScaleInLightmap(int lodLevel)
     {

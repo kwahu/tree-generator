@@ -267,7 +267,6 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
             #pragma multi_compile _ _ALPHATEST_ON
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UniversalMetaPass.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
@@ -291,6 +290,8 @@ Shader "TreeGenerator/Leaf Baked Lit GI Control"
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UniversalMetaPass.hlsl"
 
             half4 LeafFragmentMeta(Varyings input) : SV_Target
             {

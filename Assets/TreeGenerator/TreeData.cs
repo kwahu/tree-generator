@@ -272,7 +272,7 @@ public class LeafSettings
     public int countPerTipSubBranchLevel2 = 6;
 
     [Range(0f, 1f)]
-    [Tooltip("Normalized position along the branch from which intermediate leaves start (1 = tip only).")]
+    [Tooltip("Normalized position along the branch from which continuous 'countAlong*' leaves start (1 = no along leaves). Does not affect tip/node leaves.")]
     public float alongBranchStart = 0.55f;
 
     [Range(0, 100)]
@@ -319,15 +319,15 @@ public class LeafSettings
     public int placementAttemptsPerLeaf = 8;
 
     [Range(0, 100)]
-    [Tooltip("Additional leaves placed at each intermediate node on main branches past alongBranchStart.")]
+    [Tooltip("Additional leaves placed at each intermediate node on main branches (independent from alongBranchStart).")]
     public int countPerNodeMainBranch = 2;
 
     [Range(0, 100)]
-    [Tooltip("Additional leaves placed at each intermediate node on sub-branches past alongBranchStart.")]
+    [Tooltip("Additional leaves placed at each intermediate node on sub-branches (independent from alongBranchStart).")]
     public int countPerNodeSubBranch = 2;
 
     [Range(0, 100)]
-    [Tooltip("Additional leaves placed at each intermediate node on level-2 sub-branches past alongBranchStart.")]
+    [Tooltip("Additional leaves placed at each intermediate node on level-2 sub-branches (independent from alongBranchStart).")]
     public int countPerNodeSubBranchLevel2 = 1;
 
     [Min(0.05f)]

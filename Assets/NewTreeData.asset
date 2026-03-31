@@ -355,13 +355,13 @@ MonoBehaviour:
       m_RotationOrder: 4
   leaves:
     enabled: 1
-    countPerTipMainBranch: 2
-    countPerTipSubBranch: 3
-    countPerTipSubBranchLevel2: 2
-    alongBranchStart: 0.249
-    countAlongMainBranch: 38
-    countAlongSubBranch: 23
-    countAlongSubBranchLevel2: 11
+    countPerTipMainBranch: 1
+    countPerTipSubBranch: 1
+    countPerTipSubBranchLevel2: 1
+    alongBranchStart: 0.19
+    countAlongMainBranch: 29
+    countAlongSubBranch: 20
+    countAlongSubBranchLevel2: 10
     alongDistributionMainBranch:
       serializedVersion: 2
       m_Curve:
@@ -439,9 +439,9 @@ MonoBehaviour:
     minSeparationSubBranch: 0.06
     minSeparationSubBranchLevel2: 0.05
     placementAttemptsPerLeaf: 1
-    countPerNodeMainBranch: 0
-    countPerNodeSubBranch: 0
-    countPerNodeSubBranchLevel2: 0
+    countPerNodeMainBranch: 1
+    countPerNodeSubBranch: 1
+    countPerNodeSubBranchLevel2: 1
     minSize: 0.1
     maxSize: 0.1
     sizeByTreeHeight:

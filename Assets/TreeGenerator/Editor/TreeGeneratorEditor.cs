@@ -344,7 +344,9 @@ public class TreeGeneratorEditor : Editor
         EditorGUILayout.PropertyField(so.FindProperty("lodLeafReductionExponent"),
             new GUIContent("Liście: agresywność redukcji", "Wyższa wartość = szybsza redukcja liści na wcześniejszych LOD."));
         EditorGUILayout.PropertyField(so.FindProperty("lodLeafCountReductionStartLevel"),
-            new GUIContent("Liście: redukcja ilości od LOD", "1 = od pierwszego zdalnego LOD; wyżej = wcześniejsze zdalne LOD bez mnożnika ilości (tip/node nadal wyłączone od LOD 1)."));
+            new GUIContent("Liście: redukcja ilości od LOD", "1 = od pierwszego zdalnego LOD; wyżej = wcześniejsze zdalne LOD bez redukcji ilości."));
+        EditorGUILayout.PropertyField(so.FindProperty("lodReductionAffectsTipAndNodeLeaves"),
+            new GUIContent("Liście: redukuj też wierzchołki i węzły", "Gdy włączone, redukcja LOD obejmuje też countPerTip* i countPerNode*. Gdy wyłączone, redukcja dotyczy głównie countAlong* i innych mnożników."));
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField("Geometria drewna (LOD)", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(so.FindProperty("lodPreserveTrunkSegments"),

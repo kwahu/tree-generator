@@ -52,6 +52,8 @@ public class TreeGenerator : MonoBehaviour
     [Range(0.5f, 3f)] public float lodLeafReductionExponent = 1.5f;
     [Tooltip("Od tego poziomu LOD (1 = pierwszy zdalny mesh) włączana jest redukcja liczby liści (mnożnik + ewentualnie grupowanie). Na niższych poziomach zdalnych liści jest tyle co wynika z TreeData po innych regułach LOD.")]
     [Range(1, 5)] public int lodLeafCountReductionStartLevel = 1;
+    [Tooltip("Czy redukcja liści na LOD ma też wyłączać liście dodawane na końcach gałęzi i węzłach (countPerTip* / countPerNode*).")]
+    public bool lodReductionAffectsTipAndNodeLeaves = true;
     public bool useLeafVolumeLods = false;
     [Range(1, 5)] public int leafVolumeStartLodLevel = 2;
     [Range(8, 64)] public int leafVolumeGridResolution = 24;
@@ -990,11 +992,13 @@ public class TreeGenerator : MonoBehaviour
         float geoScale = Mathf.Lerp(1f, 0.3f, t);
         float leafT = Mathf.Pow(t, Mathf.Max(0.5f, lodLeafReductionExponent));
         int leafReductionStartLod = Mathf.Clamp(lodLeafCountReductionStartLevel, 1, 5);
-        float leafCountScale = level < leafReductionStartLod
-            ? 1f
-            : Mathf.Lerp(1f, Mathf.Clamp01(lodFinalLeafCountMultiplier), leafT)
-              * GetInnerClusterLeafCountReductionForLod(level);
-        float leafSizeScale = Mathf.Lerp(1f, Mathf.Max(1f, lodFinalLeafSizeMultiplier), leafT);
+        bool applyLeafReduction = level >= leafReductionStartLod;
+        float appliedLeafT = applyLeafReduction ? leafT : 0f;
+        float leafCountScale = applyLeafReduction
+            ? Mathf.Lerp(1f, Mathf.Clamp01(lodFinalLeafCountMultiplier), appliedLeafT)
+              * GetInnerClusterLeafCountReductionForLod(level)
+            : 1f;
+        float leafSizeScale = Mathf.Lerp(1f, Mathf.Max(1f, lodFinalLeafSizeMultiplier), appliedLeafT);
 
         // Preserve tree shape/silhouette: reduce mesh resolution (segments/sides); optional full segment counts.
         clone.trunk.segments = lodPreserveTrunkSegments
@@ -1017,18 +1021,20 @@ public class TreeGenerator : MonoBehaviour
         clone.subBranchesLevel2.sides = Mathf.Max(3, Mathf.RoundToInt(sourceData.subBranchesLevel2.sides * geoScale));
 
         // Aggressive leaf reduction for LODs + size compensation.
-        clone.leaves.countPerTipMainBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerTipMainBranch * leafCountScale));
-        clone.leaves.countPerTipSubBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerTipSubBranch * leafCountScale));
-        clone.leaves.countPerTipSubBranchLevel2 = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerTipSubBranchLevel2 * leafCountScale));
-        clone.leaves.countPerNodeMainBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerNodeMainBranch * leafCountScale));
-        clone.leaves.countPerNodeSubBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerNodeSubBranch * leafCountScale));
-        clone.leaves.countPerNodeSubBranchLevel2 = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerNodeSubBranchLevel2 * leafCountScale));
+        // Tip/node leaves can be excluded from reduction by checkbox.
+        float tipNodeScale = (applyLeafReduction && lodReductionAffectsTipAndNodeLeaves) ? leafCountScale : 1f;
+        clone.leaves.countPerTipMainBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerTipMainBranch * tipNodeScale));
+        clone.leaves.countPerTipSubBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerTipSubBranch * tipNodeScale));
+        clone.leaves.countPerTipSubBranchLevel2 = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerTipSubBranchLevel2 * tipNodeScale));
+        clone.leaves.countPerNodeMainBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerNodeMainBranch * tipNodeScale));
+        clone.leaves.countPerNodeSubBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerNodeSubBranch * tipNodeScale));
+        clone.leaves.countPerNodeSubBranchLevel2 = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countPerNodeSubBranchLevel2 * tipNodeScale));
         clone.leaves.countAlongMainBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countAlongMainBranch * leafCountScale));
         clone.leaves.countAlongSubBranch = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countAlongSubBranch * leafCountScale));
         clone.leaves.countAlongSubBranchLevel2 = Mathf.Max(0, Mathf.RoundToInt(sourceData.leaves.countAlongSubBranchLevel2 * leafCountScale));
 
-        // Keep tip/node leaves only on LOD0.
-        if (level >= 1)
+        // Optional: include tip/node leaves in LOD reduction.
+        if (applyLeafReduction && lodReductionAffectsTipAndNodeLeaves)
         {
             clone.leaves.countPerTipMainBranch = 0;
             clone.leaves.countPerTipSubBranch = 0;
@@ -1040,25 +1046,26 @@ public class TreeGenerator : MonoBehaviour
 
         clone.leaves.minSize = sourceData.leaves.minSize * leafSizeScale;
         clone.leaves.maxSize = sourceData.leaves.maxSize * leafSizeScale;
-        float topLeafDampingForCurve = enableLodInnerLeafClustering
+        float topLeafDampingForCurve = (enableLodInnerLeafClustering && applyLeafReduction)
             ? GetTopLeafDampingForLod(level)
             : 1f;
         clone.leaves.sizeByTreeHeight = CreateLodHeightSizeCurve(
             sourceData.leaves.sizeByTreeHeight,
-            leafT,
+            appliedLeafT,
             topLeafDampingForCurve,
             level);
-        clone.leaves.minSeparationMainBranch = sourceData.leaves.minSeparationMainBranch * Mathf.Lerp(1f, 0.55f, leafT);
-        clone.leaves.minSeparationSubBranch = sourceData.leaves.minSeparationSubBranch * Mathf.Lerp(1f, 0.55f, leafT);
-        clone.leaves.minSeparationSubBranchLevel2 = sourceData.leaves.minSeparationSubBranchLevel2 * Mathf.Lerp(1f, 0.55f, leafT);
-        clone.leaves.placementAttemptsPerLeaf = Mathf.Max(1, Mathf.RoundToInt(sourceData.leaves.placementAttemptsPerLeaf * Mathf.Lerp(1f, 0.6f, leafT)));
+        clone.leaves.minSeparationMainBranch = sourceData.leaves.minSeparationMainBranch * Mathf.Lerp(1f, 0.55f, appliedLeafT);
+        clone.leaves.minSeparationSubBranch = sourceData.leaves.minSeparationSubBranch * Mathf.Lerp(1f, 0.55f, appliedLeafT);
+        clone.leaves.minSeparationSubBranchLevel2 = sourceData.leaves.minSeparationSubBranchLevel2 * Mathf.Lerp(1f, 0.55f, appliedLeafT);
+        clone.leaves.placementAttemptsPerLeaf = Mathf.Max(1, Mathf.RoundToInt(sourceData.leaves.placementAttemptsPerLeaf * Mathf.Lerp(1f, 0.6f, appliedLeafT)));
 
         return clone;
     }
 
     private float GetInnerClusterLeafCountReductionForLod(int level)
     {
-        if (!enableLodInnerLeafClustering || level <= 0)
+        int leafReductionStartLod = Mathf.Clamp(lodLeafCountReductionStartLevel, 1, 5);
+        if (!enableLodInnerLeafClustering || level < leafReductionStartLod)
             return 1f;
 
         float replacement;
@@ -1519,14 +1526,12 @@ public class TreeGenerator : MonoBehaviour
         if (countPerTip > 0)
             AddLeavesAtNode(tip, countPerTip, ls, target, placedLeafStems, minLeafSeparation);
 
-        // Intermediate leaves from alongBranchStart toward the tip
-        if (countPerNode > 0 && ls.alongBranchStart < 1f)
+        // Node leaves are independent from alongBranchStart.
+        // alongBranchStart gates only continuous "along" distribution below.
+        if (countPerNode > 0)
         {
             for (int i = 0; i < branchNodes.Count - 1; i++)
-            {
-                if (branchNodes[i].t >= ls.alongBranchStart)
-                    AddLeavesAtNode(branchNodes[i], countPerNode, ls, target, placedLeafStems, minLeafSeparation);
-            }
+                AddLeavesAtNode(branchNodes[i], countPerNode, ls, target, placedLeafStems, minLeafSeparation);
         }
 
         // Additional continuous distribution along branch length (independent from nodes/tips).
@@ -1762,7 +1767,8 @@ public class TreeGenerator : MonoBehaviour
         groupLeaves = 1;
         sizeMultiplier = 1f;
 
-        if (!enableLodInnerLeafClustering || _activeLodLevel <= 0)
+        int leafReductionStartLod = Mathf.Clamp(lodLeafCountReductionStartLevel, 1, 5);
+        if (!enableLodInnerLeafClustering || _activeLodLevel < leafReductionStartLod)
             return false;
 
         float min01 = Mathf.Min(lodInnerClusterRangeMin01, lodInnerClusterRangeMax01);
